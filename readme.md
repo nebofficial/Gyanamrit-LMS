@@ -2892,4 +2892,7 @@ Student users have access to:
 Total API endpoints accessible to Student: **16**
 ```
 ---
+<<<<<<< HEAD
 
+=======
+>>>>>>> 2059c6024be62f7d2991c08756d697eff9999d13
