@@ -37,18 +37,15 @@ export async function addLesson(
   payload: AddLessonPayload,
   onUploadProgress?: (progress: number) => void
 ) {
-  // Check if we have files to upload (FormData)
   const hasFiles = payload.videoFile || payload.fileFile || payload.imageFile
   
   if (hasFiles) {
     const formData = new FormData()
-    // Always include required fields - ensure title is always present
     formData.append('title', payload.title)
-    // Include optional fields
+    
     if (payload.description) {
       formData.append('description', payload.description)
     }
-    // For URLs, append if provided
     if (payload.videoUrl) {
       formData.append('videoUrl', payload.videoUrl)
     }
@@ -58,7 +55,8 @@ export async function addLesson(
     if (payload.imageUrl) {
       formData.append('imageUrl', payload.imageUrl)
     }
-    // Append files if they exist - use field names that backend expects
+    
+    // Backend expects these field names for file uploads
     if (payload.videoFile) {
       formData.append('video', payload.videoFile)
     }
@@ -76,7 +74,7 @@ export async function addLesson(
       onUploadProgress,
     })
   } else {
-    // Regular JSON payload (URLs only)
+    // No files, just send JSON with URLs
     return apiFetch<{ status: string; message: string; data: Lesson }>(`/course/${courseId}/lesson`, {
       method: 'POST',
       token,

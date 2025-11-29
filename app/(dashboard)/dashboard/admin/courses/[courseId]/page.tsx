@@ -93,12 +93,11 @@ export default function CourseDetailPage() {
     if (!token || !params.courseId) return
     setLoading(true)
     try {
-      // For admin, first try to get course from the list (which has all courses)
-      // The detail endpoint requires enrollment, but admin should see all courses
+      // Admin needs to see all courses, but the detail endpoint requires enrollment
+      // So we fetch from the admin courses list instead
       let courseData: Course | null = null
       
       try {
-        // Fetch all courses and find the one we need
         const allCoursesRes = await dashboardService.getAdminCourses(token)
         const foundCourse = allCoursesRes.data?.find((c) => c.id === params.courseId)
         
@@ -106,12 +105,10 @@ export default function CourseDetailPage() {
           courseData = foundCourse as Course
           setCourse(courseData)
           
-          // Try to get lessons separately (may require enrollment, so handle gracefully)
-          // Skip fetching lessons - the endpoint requires enrollment
-          // Admin can view course details without lessons list
+          // Can't fetch lessons here since the endpoint requires enrollment
           setLessons([])
         } else {
-          // Fallback: Try the detail endpoint (might work for some cases)
+          // Try the detail endpoint as a fallback
           try {
             const courseRes = await courseService.getCourseById(token, params.courseId)
             courseData = courseRes.data as Course
@@ -121,7 +118,7 @@ export default function CourseDetailPage() {
               setLessons(courseData.lessons)
             }
           } catch (detailError: any) {
-            // If it's an enrollment error, that's expected - we already have the course from list
+            // Expected error - detail endpoint needs enrollment, but we already have the course
             if (detailError?.message?.includes("enrolled") || detailError?.message?.includes("enrollment")) {
               console.log("Detail endpoint requires enrollment - using course from list instead")
             } else {
@@ -136,15 +133,13 @@ export default function CourseDetailPage() {
         return
       }
 
-      // Note: Lessons endpoint requires enrollment, so we skip it for admin
-      // Admin can view course details without lessons list
-      // If lessons are needed, they would need to be fetched via a different admin endpoint
+      // Lessons endpoint needs enrollment, so we skip it for now
+      // Admin can still view course details without the lessons list
       if (courseData && (!courseData.lessons || courseData.lessons.length === 0)) {
-        // Keep lessons empty - the endpoint requires enrollment which admin doesn't have for all courses
         setLessons([])
       }
 
-      // Try to get enrollments (this should work for admin)
+      // Fetch enrollments for this course
       try {
         const enrollmentsRes = await dashboardService.getEnrollmentsByCourse(token, params.courseId)
         console.log('Admin enrollments response:', enrollmentsRes)
@@ -152,12 +147,12 @@ export default function CourseDetailPage() {
         console.log('Setting enrollments:', enrollmentData.length, enrollmentData)
         setEnrollments(enrollmentData)
       } catch (err: any) {
-        // Enrollment endpoint might also have restrictions, handle gracefully
+        // Enrollment endpoint might have restrictions, so try a fallback
         console.error("Failed to fetch enrollments:", err)
         if (err?.message?.includes("enrolled") || err?.message?.includes("enrollment")) {
           console.log("Enrollments endpoint has restrictions - trying fallback")
         }
-        // Try to get all enrollments and filter manually as fallback
+        // Get all enrollments and filter manually
         try {
           const allEnrollmentsRes = await dashboardService.getEnrollments(token)
           const filtered = allEnrollmentsRes.data?.filter(
@@ -207,25 +202,22 @@ export default function CourseDetailPage() {
       setUploadProgress(0)
       setIsAddLessonDialogOpen(false)
       
-      // Refresh lessons - try multiple approaches
+      // Refresh the lessons list
       try {
-        // First try: get lessons from course detail (works if enrolled or is instructor/admin of course)
         const lessonsRes = await lessonService.getLessonsByCourse(token, params.courseId)
         if (Array.isArray(lessonsRes.data)) {
           setLessons(lessonsRes.data)
         }
       } catch (err) {
-        // If that fails, try refreshing course data which might include lessons
+        // If that fails, try refreshing the full course data
         try {
           const courseRes = await courseService.getCourseById(token, params.courseId)
           if (courseRes.data?.lessons && Array.isArray(courseRes.data.lessons)) {
             setLessons(courseRes.data.lessons)
           } else {
-            // Last resort: refresh all course data
             fetchCourseData()
           }
         } catch (courseErr) {
-          // Final fallback: refresh all course data
           fetchCourseData()
         }
       }
@@ -241,7 +233,7 @@ export default function CourseDetailPage() {
     setLoadingUsers(true)
     try {
       const response = await userService.listUsers(token)
-      // Filter to only show students (and exclude already enrolled users)
+      // Only show students who aren't already enrolled
       const enrolledUserIds = new Set(enrollments.map((e) => e.userId))
       const students = (response.data ?? []).filter(
         (user) => user.role === "student" && !enrolledUserIds.has(user.id)
@@ -271,7 +263,6 @@ export default function CourseDetailPage() {
     if (!token || !params.courseId || selectedUserIds.size === 0) return
     setEnrollingUsers(true)
     try {
-      // Enroll all selected users
       const enrollmentPromises = Array.from(selectedUserIds).map((userId) =>
         dashboardService.addEnrollment(token, {
           userId,
@@ -283,7 +274,7 @@ export default function CourseDetailPage() {
       toast.success(`Successfully enrolled ${selectedUserIds.size} user(s) in this course.`)
       setIsAddEnrollmentDialogOpen(false)
       setSelectedUserIds(new Set())
-      // Refresh enrollments
+      // Refresh the enrollments list
       try {
         const enrollmentsRes = await dashboardService.getEnrollmentsByCourse(token, params.courseId)
         console.log('Refreshed enrollments after adding:', enrollmentsRes)
@@ -323,7 +314,7 @@ export default function CourseDetailPage() {
       setSelectedEnrollment(null)
       setUpdatePaymentStatus("pending")
       
-      // Refresh enrollments
+      // Refresh the enrollments list
       try {
         const enrollmentsRes = await dashboardService.getEnrollmentsByCourse(token, params.courseId)
         setEnrollments(enrollmentsRes.data ?? [])
@@ -357,7 +348,7 @@ export default function CourseDetailPage() {
       await dashboardService.deleteEnrollment(token, enrollmentId)
       toast.success("Enrollment deleted successfully.")
       
-      // Refresh enrollments
+      // Refresh the enrollments list
       try {
         const enrollmentsRes = await dashboardService.getEnrollmentsByCourse(token, params.courseId)
         setEnrollments(enrollmentsRes.data ?? [])

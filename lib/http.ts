@@ -28,13 +28,12 @@ export async function apiFetch<T>(path: string, options: ApiOptions = {}): Promi
 
   const url = isAbsoluteUrl(path) ? path : `${API_BASE_URL}${path.startsWith('/') ? path : `/${path}`}`
   
-  // Check if body is FormData
   const isFormData = body instanceof FormData
   
   const init: RequestInit = {
     method,
     headers: {
-      // Don't set Content-Type for FormData, let browser set it with boundary
+      // Browser handles Content-Type for FormData (includes boundary)
       ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
       ...(headers ?? {}),
     },
@@ -45,7 +44,7 @@ export async function apiFetch<T>(path: string, options: ApiOptions = {}): Promi
     if (isFormData) {
       init.body = body as FormData
     } else {
-      init.body = JSON.stringify(body)
+    init.body = JSON.stringify(body)
     }
   }
 
@@ -53,7 +52,7 @@ export async function apiFetch<T>(path: string, options: ApiOptions = {}): Promi
     ;(init.headers as Record<string, string>).Authorization = `Bearer ${token}`
   }
 
-  // For file uploads with progress, use XMLHttpRequest instead of fetch
+  // Use XHR for file uploads so we can track progress
   if (isFormData && onUploadProgress) {
     return new Promise<T>((resolve, reject) => {
       const xhr = new XMLHttpRequest()
@@ -98,12 +97,11 @@ export async function apiFetch<T>(path: string, options: ApiOptions = {}): Promi
       
       xhr.open(method || 'POST', url)
       
-      // Set authorization header
       if (token) {
         xhr.setRequestHeader('Authorization', `Bearer ${token}`)
       }
       
-      // Set custom headers (except Content-Type which is set by browser for FormData)
+      // Don't override Content-Type - browser needs to set boundary
       if (headers) {
         Object.entries(headers).forEach(([key, value]) => {
           if (key.toLowerCase() !== 'content-type') {
@@ -115,18 +113,17 @@ export async function apiFetch<T>(path: string, options: ApiOptions = {}): Promi
       xhr.send(body as FormData)
     })
   } else {
-    // Use regular fetch for non-FormData or FormData without progress
-    const response = await fetch(url, init)
-    const contentType = response.headers.get('content-type')
-    const isJson = contentType?.includes('application/json')
-    const data = isJson ? await response.json() : await response.text()
+  const response = await fetch(url, init)
+  const contentType = response.headers.get('content-type')
+  const isJson = contentType?.includes('application/json')
+  const data = isJson ? await response.json() : await response.text()
 
-    if (!response.ok) {
-      const message = (isJson && (data?.message ?? data?.error)) || response.statusText || 'Request failed'
-      throw new ApiError(message, response.status, data)
-    }
+  if (!response.ok) {
+    const message = (isJson && (data?.message ?? data?.error)) || response.statusText || 'Request failed'
+    throw new ApiError(message, response.status, data)
+  }
 
-    return data as T
+  return data as T
   }
 }
 

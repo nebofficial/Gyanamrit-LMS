@@ -8,7 +8,6 @@ export function StickyContactButton() {
   const [isOpen, setIsOpen] = useState(false)
   const pathname = usePathname()
   
-  // Hide contact button on dashboard pages
   if (pathname?.startsWith("/dashboard")) {
     return null
   }
@@ -68,7 +67,6 @@ export function StickyContactButton() {
             >
               <Icon className="w-5 h-5 md:w-6 md:h-6" />
 
-              {/* Tooltip on hover */}
               <div className="absolute right-full mr-2 bg-primary text-primary-foreground px-3 py-1 rounded text-xs md:text-sm whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
                 {method.label}
               </div>
@@ -77,7 +75,6 @@ export function StickyContactButton() {
         })}
       </div>
 
-      {/* Mobile floating button */}
       <div className="fixed bottom-6 right-4 z-40 sm:hidden">
         <button
           onClick={() => setIsOpen(!isOpen)}
@@ -86,7 +83,6 @@ export function StickyContactButton() {
           <Heart className="w-6 h-6" />
         </button>
 
-        {/* Mobile menu */}
         {isOpen && (
           <div className="absolute bottom-16 right-0 bg-white rounded-lg shadow-xl overflow-hidden border border-border">
             {contactMethods.map((method) => {

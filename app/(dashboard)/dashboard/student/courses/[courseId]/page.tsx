@@ -35,16 +35,15 @@ export default function StudentCourseDetailPage() {
     if (!token || !params.courseId) return
     setLoading(true)
     try {
-      // Fetch course details (requires enrollment)
       const courseRes = await courseService.getCourseById(token, params.courseId)
       const courseData = courseRes.data
       setCourse(courseData)
 
-      // Extract lessons from course response if available
+      // Get lessons from the course response if available
       if (courseData.lessons && Array.isArray(courseData.lessons)) {
         setLessons(courseData.lessons)
       } else {
-        // Try to get lessons separately
+        // Otherwise fetch them separately
         try {
           const lessonsRes = await lessonService.getLessonsByCourse(token, params.courseId)
           setLessons(lessonsRes.data ?? [])
@@ -53,7 +52,7 @@ export default function StudentCourseDetailPage() {
         }
       }
 
-      // Fetch enrollment to check payment status
+      // Check enrollment status to see if student can access content
       try {
         const enrollmentsRes = await dashboardService.getEnrollments(token)
         const studentEnrollment = enrollmentsRes.data?.find(
@@ -79,7 +78,7 @@ export default function StudentCourseDetailPage() {
 
   const canViewContent = () => {
     if (!enrollment) return false
-    // Can view if payment status is "free" or "paid"
+    // Student can view content if payment is approved (free or paid)
     return enrollment.paymentStatus === "free" || enrollment.paymentStatus === "paid"
   }
 

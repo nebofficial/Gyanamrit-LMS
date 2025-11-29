@@ -3,6 +3,7 @@ type DecodedToken<T> = T & {
   iat?: number
 }
 
+// JWT uses URL-safe base64, need to convert to standard base64
 const decodeBase64 = (segment: string) => {
   const normalized = segment.replace(/-/g, '+').replace(/_/g, '/')
   if (typeof window === 'undefined') {
@@ -10,6 +11,7 @@ const decodeBase64 = (segment: string) => {
   }
 
   const decoded = atob(normalized)
+  // Handle UTF-8 encoding properly in browser
   return decodeURIComponent(
     decoded
       .split('')

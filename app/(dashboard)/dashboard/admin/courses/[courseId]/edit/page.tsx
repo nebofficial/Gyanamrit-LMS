@@ -69,7 +69,6 @@ export default function EditCoursePage() {
     if (!token || !params.courseId) return
     setLoading(true)
     try {
-      // Fetch course from admin list (no enrollment required)
       const allCoursesRes = await dashboardService.getAdminCourses(token)
       const course = allCoursesRes.data?.find((c) => c.id === params.courseId)
 

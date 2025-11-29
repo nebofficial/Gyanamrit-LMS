@@ -75,7 +75,6 @@ export default function AdminCoursesPage() {
     setLoadingAdmin(true)
     setLoadingInstructor(true)
     try {
-      // Fetch all courses (any status) through the main endpoint
       const [coursesResponse, categoriesResponse] = await Promise.allSettled([
         dashboardService.getAdminCourses(token),
         categoryService.getAllCategories(),
@@ -84,7 +83,6 @@ export default function AdminCoursesPage() {
       const allCourses = coursesResponse.status === "fulfilled" ? (coursesResponse.value.data ?? []) : []
       const allCategories = categoriesResponse.status === "fulfilled" ? (categoriesResponse.value.data ?? []) : []
       
-      // Fetch instructor/user data for all unique instructor IDs
       const uniqueInstructorIds = [...new Set(allCourses.map(c => c.instructorId).filter((id): id is string => Boolean(id)))]
       const instructorPromises = uniqueInstructorIds.map(id => 
         userService.getUserById(token, id).catch(() => null)

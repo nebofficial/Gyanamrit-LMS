@@ -20,7 +20,6 @@ export function Navbar() {
     <nav className="sticky top-0 z-50 bg-gradient-to-r from-red-900 to-red-800 shadow-lg">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
-          {/* Logo with cultural aesthetic */}
           <div className="flex items-center gap-2">
             <div className="w-10 h-10 bg-gradient-to-br from-amber-400 to-amber-600 rounded-md flex items-center justify-center text-red-900 font-bold text-sm shadow-md">
               GM
@@ -28,7 +27,6 @@ export function Navbar() {
             <span className="font-serif font-bold text-amber-100 hidden sm:inline text-lg">Gyanamrit</span>
           </div>
 
-          {/* Desktop Menu */}
           <div className="hidden md:flex items-center gap-8">
             <Link href="/" className="text-amber-100 hover:text-white text-sm font-medium transition">
               Home
@@ -45,7 +43,6 @@ export function Navbar() {
             </Link>
           </div>
 
-          {/* Right Side */}
           <div className="hidden md:flex items-center gap-4">
             {isAuthenticated ? (
               <>
@@ -82,13 +79,11 @@ export function Navbar() {
             )}
           </div>
 
-          {/* Mobile Menu Button */}
           <button className="md:hidden text-amber-100" onClick={() => setIsOpen(!isOpen)}>
             {isOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
           </button>
         </div>
 
-        {/* Mobile Menu */}
         {isOpen && (
           <div className="md:hidden pb-4 border-t border-red-700 bg-red-800">
             <Link href="/" className="block py-2 text-amber-100 hover:text-white text-sm font-medium">

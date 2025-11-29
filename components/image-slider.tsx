@@ -14,7 +14,7 @@ export function ImageSlider({ className }: { className?: string }) {
   const timeoutRef = useRef<number | null>(null)
 
   useEffect(() => {
-    // autoplay every 4 seconds
+    // Auto-advance to next image every 4 seconds
     timeoutRef.current = window.setTimeout(() => setIndex((i) => (i + 1) % IMAGES.length), 4000)
     return () => {
       if (timeoutRef.current) window.clearTimeout(timeoutRef.current)
@@ -34,7 +34,6 @@ export function ImageSlider({ className }: { className?: string }) {
         />
       </div>
 
-      {/* Controls */}
       <button
         onClick={prev}
         aria-label="Previous"
@@ -50,7 +49,6 @@ export function ImageSlider({ className }: { className?: string }) {
         ›
       </button>
 
-      {/* Indicators */}
       <div className="absolute left-1/2 -translate-x-1/2 bottom-3 flex gap-2">
         {IMAGES.map((_, i) => (
           <button

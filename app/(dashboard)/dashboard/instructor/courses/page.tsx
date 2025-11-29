@@ -58,30 +58,26 @@ export default function InstructorCoursesPage() {
     if (!token || !user?.id) return
     setLoading(true)
     try {
-      // Try the instructor-specific endpoint first
       try {
         const response = await dashboardService.getInstructorCourses(token)
         setCourses(response.data ?? [])
       } catch (instructorError) {
-        // Fallback: Try using the main course endpoint
-        // The backend should filter by instructorId based on the token
+        // Fallback to admin endpoint if instructor endpoint fails
         console.warn("Instructor endpoint failed, trying main endpoint:", instructorError)
         try {
           const response = await dashboardService.getAdminCourses(token)
-          // Filter courses by current instructor (if backend doesn't do it automatically)
           const allCourses = response.data ?? []
           const myCourses = allCourses.filter((course) => course.instructorId === user.id)
           setCourses(myCourses)
         } catch (fallbackError) {
           console.error("Both endpoints failed:", fallbackError)
-          throw instructorError // Throw the original error
+          throw instructorError
         }
       }
     } catch (error) {
       console.error("Failed to fetch courses:", error)
       const errorMessage = error instanceof Error ? error.message : "Unable to load courses."
       toast.error(errorMessage)
-      // Set empty array on error so UI doesn't break
       setCourses([])
     } finally {
       setLoading(false)

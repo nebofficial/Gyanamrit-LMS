@@ -29,6 +29,7 @@ type AuthContextValue = {
 
 const AuthContext = createContext<AuthContextValue | null>(null)
 
+// Build user object from JWT token when profile fetch fails
 const buildUserFromToken = (token: string, overrides?: Partial<UserProfile>): UserProfile | null => {
   const decoded = decodeJwt<{ id?: string; role?: UserRole }>(token)
   if (!decoded?.id) return null
@@ -123,6 +124,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(nextUser)
       persistSession({ token: accessToken, user: nextUser })
 
+      // Clear session on page close if "remember me" wasn't checked
       if (!payload.remember) {
         if (typeof window !== "undefined") {
           window.addEventListener(
@@ -156,7 +158,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         persistSession({ token, user: updated })
         return updated
       } catch {
-        // fallback to local state update
+        // Update locally if API call fails
         const merged = { ...(user ?? buildUserFromToken(token, { email: payload.email ?? user?.email })), ...payload }
         setUser(merged || null)
         persistSession({ token, user: merged || null })
@@ -171,7 +173,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       await userService.deleteProfile(token)
     } catch {
-      // ignore backend failure, still log out
+      // Still log out even if API call fails
     } finally {
       logout()
     }

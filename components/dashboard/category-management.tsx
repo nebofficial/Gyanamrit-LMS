@@ -116,7 +116,7 @@ export function CategoryManagement({ title = "Category Management", canManage = 
       if (created) {
         setCategories((prev) => [created, ...prev])
       } else {
-        // fallback: refetch
+        // If the response doesn't include the created category, refresh the list
         fetchCategories()
       }
       toast.success(response.message ?? "Category added.")

@@ -66,7 +66,7 @@ export default function SignupPage() {
       try {
         await authService.requestVerificationToken(values.email)
       } catch {
-        // ignore resend failure, signup already succeeded
+        // Signup succeeded, ignore resend failure
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unable to create account right now."

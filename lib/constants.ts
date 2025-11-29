@@ -3,7 +3,6 @@ export const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/,
 export const AUTH_STORAGE_KEY = 'gyanamrit_auth'
 
 export const DASHBOARD_ROUTES: Record<string, string> = {
-  // After login, always go to the unified overview dashboard
   student: '/dashboard/overview',
   instructor: '/dashboard/overview',
   admin: '/dashboard/overview',

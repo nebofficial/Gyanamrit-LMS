@@ -16,7 +16,6 @@ export default function AboutPage() {
       <TopContactBar />
       <Navbar />
 
-      {/* Hero Section */}
       <section className="bg-gradient-to-r from-primary to-red-900 text-white py-12 md:py-20">
         <div className="container mx-auto px-4 md:px-6">
           <h1 className="text-4xl md:text-5xl font-bold mb-4 text-balance">About Gyanamrit</h1>
@@ -24,8 +23,7 @@ export default function AboutPage() {
         </div>
       </section>
 
-      {/* Mission Section */}
-  <section className="py-12 md:py-20 bg-accent/5">
+      <section className="py-12 md:py-20 bg-accent/5">
         <div className="container mx-auto px-4 md:px-6 max-w-6xl">
           <div className="grid md:grid-cols-2 gap-8 items-center">
             <div>
@@ -40,26 +38,15 @@ export default function AboutPage() {
                 technology to create an unforgettable learning journey.
               </p>
             </div>
-            {/* <div className="bg-accent/10 rounded-lg p-8 border-2 border-accent"> */}
             <div className="relative h-64 xs:h-72 sm:h-80 md:h-96 flex items-center justify-center">
-            
-              {/* Image slider component inserted here */}
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              {/* The slider is a client component imported below */}
               <div className="w-full h-full">
-                {/* dynamic client component */}
-                {/* Imported at top of file */}
                 <ImageSlider className="h-full w-full" />
               </div>
-              
-           
-          </div>
             </div>
           </div>
-        {/* </div> */}
+        </div>
       </section>
 
-      {/* Values Section */}
       <section className="py-12 md:py-20 bg-accent/5">
         <div className="container mx-auto px-4 md:px-6 max-w-6xl">
           <h2 className="text-3xl md:text-4xl font-bold text-primary text-center mb-12">Our Core Values</h2>
@@ -83,7 +70,6 @@ export default function AboutPage() {
         </div>
       </section>
 
-      {/* Team Section */}
       <section className="py-12 md:py-20 bg-background">
         <div className="container mx-auto px-4 md:px-6 max-w-4xl">
           <h2 className="text-3xl md:text-4xl font-bold text-primary text-center mb-12">Dedicated to Your Learning</h2>

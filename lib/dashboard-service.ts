@@ -94,16 +94,14 @@ export async function deleteEnrollment(token: string, enrollmentId: string) {
 }
 
 export async function getEnrollmentsByCourse(token: string, courseId: string) {
-  // Backend doesn't have course-specific endpoint, so get all enrollments and filter by courseId
+  // Backend doesn't have a course-specific endpoint, so we fetch all and filter client-side
   const allEnrollments = await apiFetch<{ status: string; data: Enrollment[] }>('/enrollment/course', {
     method: 'GET',
     token,
   })
   
-  // Normalize courseId for comparison (handle UUID string variations)
   const normalizedCourseId = String(courseId).toLowerCase().trim()
   
-  // Filter enrollments by courseId (case-insensitive comparison)
   const filtered = allEnrollments.data?.filter((e) => {
     const enrollmentCourseId = String(e.courseId || '').toLowerCase().trim()
     return enrollmentCourseId === normalizedCourseId

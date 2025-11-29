@@ -85,33 +85,30 @@ export default function InstructorCourseDetailPage() {
     if (!token || !params.courseId || !user?.id) return
     setLoading(true)
     try {
-      // For instructor, first try to get course from their own courses list
-      // The detail endpoint requires enrollment, but instructor should see their own courses
+      // Instructors can see their own courses even without enrollment
       let courseData: Course | null = null
       
       try {
-        // Fetch instructor's own courses and find the one we need
         const instructorCoursesRes = await dashboardService.getInstructorCourses(token)
         const foundCourse = instructorCoursesRes.data?.find((c) => c.id === params.courseId)
         
         if (foundCourse && String(foundCourse.instructorId) === String(user.id)) {
-          // Verify this course belongs to the current instructor
           courseData = foundCourse as Course
           setCourse(courseData)
           
-          // Try to get lessons separately (may require enrollment, so handle gracefully)
+          // Try to fetch lessons for this course
           try {
             const lessonsRes = await lessonService.getLessonsByCourse(token, params.courseId)
             if (Array.isArray(lessonsRes.data)) {
               setLessons(lessonsRes.data)
             }
           } catch (lessonError: any) {
-            // Log a warning if lessons cannot be fetched, but don't block the page
+            // Lessons might not be available, but that's okay
             console.warn("Could not fetch lessons for instructor:", lessonError)
             setLessons([])
           }
         } else {
-          // Course not found in instructor's list or doesn't belong to them
+          // This course doesn't belong to the current instructor
           toast.error("Course not found or you do not have permission to view this course.")
           return
         }
@@ -122,7 +119,7 @@ export default function InstructorCourseDetailPage() {
         return
       }
 
-      // Try to get enrollments
+      // Fetch enrollments for this course
       try {
         const enrollmentsRes = await dashboardService.getEnrollmentsByCourse(token, params.courseId)
         console.log('Instructor enrollments response:', enrollmentsRes)
@@ -130,9 +127,8 @@ export default function InstructorCourseDetailPage() {
         console.log('Setting enrollments:', enrollmentData.length, enrollmentData)
         setEnrollments(enrollmentData)
       } catch (err: any) {
-        // Enrollment endpoint might have restrictions, handle gracefully
+        // If that fails, get all enrollments and filter manually
         console.error("Failed to fetch enrollments:", err)
-        // Try to get all enrollments and filter manually as fallback
         try {
           const allEnrollmentsRes = await dashboardService.getEnrollments(token)
           const filtered = allEnrollmentsRes.data?.filter(
@@ -182,25 +178,22 @@ export default function InstructorCourseDetailPage() {
       setUploadProgress(0)
       setIsAddLessonDialogOpen(false)
       
-      // Refresh lessons - try multiple approaches
+      // Refresh the lessons list
       try {
-        // First try: get lessons from course detail (works if enrolled or is instructor/admin of course)
         const lessonsRes = await lessonService.getLessonsByCourse(token, params.courseId)
         if (Array.isArray(lessonsRes.data)) {
           setLessons(lessonsRes.data)
         }
       } catch (err) {
-        // If that fails, try refreshing course data which might include lessons
+        // If that fails, try refreshing the full course data
         try {
           const courseRes = await courseService.getCourseById(token, params.courseId)
           if (courseRes.data?.lessons && Array.isArray(courseRes.data.lessons)) {
             setLessons(courseRes.data.lessons)
           } else {
-            // Last resort: refresh all course data
             fetchCourseData()
           }
         } catch (courseErr) {
-          // Final fallback: refresh all course data
           fetchCourseData()
         }
       }
@@ -216,7 +209,7 @@ export default function InstructorCourseDetailPage() {
     setLoadingUsers(true)
     try {
       const response = await userService.listUsers(token)
-      // Filter to only show students (and exclude already enrolled users)
+      // Only show students who aren't already enrolled
       const enrolledUserIds = new Set(enrollments.map((e) => e.userId))
       const students = (response.data ?? []).filter(
         (user) => user.role === "student" && !enrolledUserIds.has(user.id)
@@ -246,7 +239,6 @@ export default function InstructorCourseDetailPage() {
     if (!token || !params.courseId || selectedUserIds.size === 0) return
     setEnrollingUsers(true)
     try {
-      // Enroll all selected users
       const enrollmentPromises = Array.from(selectedUserIds).map((userId) =>
         dashboardService.addEnrollment(token, {
           userId,
@@ -258,14 +250,14 @@ export default function InstructorCourseDetailPage() {
       toast.success(`Successfully enrolled ${selectedUserIds.size} user(s) in this course.`)
       setIsAddEnrollmentDialogOpen(false)
       setSelectedUserIds(new Set())
-      // Refresh enrollments
+      // Refresh the enrollments list
       try {
         const enrollmentsRes = await dashboardService.getEnrollmentsByCourse(token, params.courseId)
         console.log('Instructor refreshed enrollments after adding:', enrollmentsRes)
         setEnrollments(enrollmentsRes.data ?? [])
       } catch (err) {
         console.error("Failed to refresh enrollments, trying fallback:", err)
-        // Fallback: get all enrollments and filter
+        // Get all enrollments and filter manually
         try {
           const allEnrollmentsRes = await dashboardService.getEnrollments(token)
           const filtered = allEnrollmentsRes.data?.filter(

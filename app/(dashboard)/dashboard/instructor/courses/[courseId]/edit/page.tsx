@@ -76,7 +76,6 @@ export default function InstructorEditCoursePage() {
     if (!token || !params.courseId) return
     setLoading(true)
     try {
-      // Fetch instructor's own courses
       const coursesRes = await dashboardService.getInstructorCourses(token)
       const course = coursesRes.data?.find((c) => c.id === params.courseId)
 
@@ -146,7 +145,6 @@ export default function InstructorEditCoursePage() {
           : undefined,
       }
 
-      // Update course
       await courseService.updateCourse(token, params.courseId, payload)
       
       // When instructor edits, set status to pending for admin review

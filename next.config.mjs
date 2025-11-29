@@ -6,7 +6,6 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
-  // Standalone output for custom deployment
   output: 'standalone',
 }
 

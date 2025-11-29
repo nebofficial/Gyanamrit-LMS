@@ -86,7 +86,7 @@ export default function StudentDashboardPage() {
         const response = await dashboardService.getPublicCourses()
         setCourses(response.data ?? [])
       } catch {
-        // ignore
+        // Failed to fetch courses
       } finally {
         setLoadingCourses(false)
       }

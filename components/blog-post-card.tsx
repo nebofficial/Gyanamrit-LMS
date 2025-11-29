@@ -10,16 +10,16 @@ export function BlogPostCard({ post }: { post: Post }) {
       try {
         await navigator.share({ title: post.title, url: `${location.origin}/blog/${post.slug}` })
       } catch (e) {
-        // ignore
+        // User cancelled or share failed, that's okay
       }
     } else {
-      // fallback: copy to clipboard
+      // Share API not available, so copy link to clipboard instead
       try {
         await navigator.clipboard.writeText(`${location.origin}/blog/${post.slug}`)
         // eslint-disable-next-line no-console
         console.debug("Link copied to clipboard")
       } catch (e) {
-        // ignore
+        // Clipboard access failed, that's okay
       }
     }
   }

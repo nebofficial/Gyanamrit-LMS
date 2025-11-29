@@ -43,7 +43,6 @@ export default function StudentCoursesPage() {
     setLoadingCourses(true)
     try {
       const response = await dashboardService.getPublicCourses()
-      // Filter to only show published and approved courses
       const publishedCourses = (response.data ?? []).filter(
         (course) => course.status === "published" && course.isApproved === true
       )
@@ -79,7 +78,6 @@ export default function StudentCoursesPage() {
         courseId: courseId,
       })
       toast.success("Enrollment request submitted successfully!")
-      // Refresh enrollments to show the new enrollment
       await fetchEnrollments()
     } catch (error: any) {
       console.error("Enrollment error:", error)
@@ -94,7 +92,6 @@ export default function StudentCoursesPage() {
     router.push(`/dashboard/student/courses/${courseId}`)
   }
 
-  // Get enrolled course IDs
   const enrolledCourseIds = useMemo(() => {
     return new Set(enrollments.map((e) => e.courseId))
   }, [enrollments])

@@ -1,11 +1,7 @@
-﻿# Node modules
-node_modules/
-# Next build output
+﻿node_modules/
 .next/
-# Logs
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-# OS files
 .DS_Store
 Thumbs.db
