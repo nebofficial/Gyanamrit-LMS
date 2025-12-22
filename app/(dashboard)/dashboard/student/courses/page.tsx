@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useMemo } from "react"
 import { useRouter } from "next/navigation"
-import { Loader2, BookOpen, Eye, GraduationCap, Clock, CheckCircle, XCircle } from "lucide-react"
+import { Loader2, BookOpen, Eye, GraduationCap, Clock, CheckCircle, XCircle, Search, X } from "lucide-react"
 import { toast } from "sonner"
 
 import { useAuth } from "@/components/providers/auth-provider"
@@ -10,6 +10,8 @@ import { DASHBOARD_ROUTES } from "@/lib/constants"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import * as dashboardService from "@/lib/dashboard-service"
@@ -18,11 +20,17 @@ import type { Course, Enrollment } from "@/lib/dashboard-service"
 export default function StudentCoursesPage() {
   const { token, user } = useAuth()
   const router = useRouter()
-  const [availableCourses, setAvailableCourses] = useState<Course[]>([])
+  // const [availableCourses, setAvailableCourses] = useState<Course[]>([])
   const [enrollments, setEnrollments] = useState<Enrollment[]>([])
-  const [loadingCourses, setLoadingCourses] = useState(true)
+  // const [loadingCourses, setLoadingCourses] = useState(true)
   const [loadingEnrollments, setLoadingEnrollments] = useState(true)
   const [enrollingCourseId, setEnrollingCourseId] = useState<string | null>(null)
+  
+  // Search and filter states
+  const [searchQuery, setSearchQuery] = useState("")
+  const [selectedInstructor, setSelectedInstructor] = useState<string>("all")
+  const [selectedLevel, setSelectedLevel] = useState<string>("all")
+  const [selectedDate, setSelectedDate] = useState<string>("all")
 
   useEffect(() => {
     if (user?.role !== "student") {
@@ -35,25 +43,25 @@ export default function StudentCoursesPage() {
     fetchEnrollments()
   }, [token])
 
-  useEffect(() => {
-    fetchAvailableCourses()
-  }, [])
+  // useEffect(() => {
+  //   fetchAvailableCourses()
+  // }, [])
 
-  const fetchAvailableCourses = async () => {
-    setLoadingCourses(true)
-    try {
-      const response = await dashboardService.getPublicCourses()
-      const publishedCourses = (response.data ?? []).filter(
-        (course) => course.status === "published" && course.isApproved === true
-      )
-      setAvailableCourses(publishedCourses)
-    } catch (error) {
-      console.error("Failed to fetch courses:", error)
-      toast.error("Unable to load available courses.")
-    } finally {
-      setLoadingCourses(false)
-    }
-  }
+  // const fetchAvailableCourses = async () => {
+  //   setLoadingCourses(true)
+  //   try {
+  //     const response = await dashboardService.getPublicCourses()
+  //     const publishedCourses = (response.data ?? []).filter(
+  //       (course) => course.status === "published" && course.isApproved === true
+  //     )
+  //     setAvailableCourses(publishedCourses)
+  //   } catch (error) {
+  //     console.error("Failed to fetch courses:", error)
+  //     toast.error("Unable to load available courses.")
+  //   } finally {
+  //     setLoadingCourses(false)
+  //   }
+  // }
 
   const fetchEnrollments = async () => {
     if (!token) return
@@ -92,9 +100,9 @@ export default function StudentCoursesPage() {
     router.push(`/dashboard/student/courses/${courseId}`)
   }
 
-  const enrolledCourseIds = useMemo(() => {
-    return new Set(enrollments.map((e) => e.courseId))
-  }, [enrollments])
+  // const enrolledCourseIds = useMemo(() => {
+  //   return new Set(enrollments.map((e) => e.courseId))
+  // }, [enrollments])
 
   // Get enrolled courses with enrollment details
   const enrolledCourses = useMemo(() => {
@@ -106,10 +114,91 @@ export default function StudentCoursesPage() {
       .filter((item) => item.id) // Filter out any without course data
   }, [enrollments])
 
+  // Get unique instructors and levels for filters
+  const instructors = useMemo(() => {
+    const unique = new Set<string>()
+    enrolledCourses.forEach((course) => {
+      if (course.instructor?.name) {
+        unique.add(course.instructor.name)
+      }
+    })
+    return Array.from(unique).sort()
+  }, [enrolledCourses])
+
+  const levels = useMemo(() => {
+    const unique = new Set<string>()
+    enrolledCourses.forEach((course) => {
+      if (course.level) {
+        unique.add(course.level)
+      }
+    })
+    return Array.from(unique).sort()
+  }, [enrolledCourses])
+
+  // Filter courses based on search and filters
+  const filteredCourses = useMemo(() => {
+    let filtered = enrolledCourses
+
+    // Search filter
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase()
+      filtered = filtered.filter(
+        (course) =>
+          course.title?.toLowerCase().includes(query) ||
+          course.description?.toLowerCase().includes(query) ||
+          course.instructor?.name?.toLowerCase().includes(query)
+      )
+    }
+
+    // Instructor filter
+    if (selectedInstructor !== "all") {
+      filtered = filtered.filter((course) => course.instructor?.name === selectedInstructor)
+    }
+
+    // Level filter
+    if (selectedLevel !== "all") {
+      filtered = filtered.filter((course) => course.level === selectedLevel)
+    }
+
+    // Date filter
+    if (selectedDate !== "all") {
+      const now = new Date()
+      filtered = filtered.filter((course) => {
+        if (!course.enrollment?.enrolledAt) return false
+        const enrolledDate = new Date(course.enrollment.enrolledAt)
+        
+        switch (selectedDate) {
+          case "today":
+            return enrolledDate.toDateString() === now.toDateString()
+          case "week":
+            const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+            return enrolledDate >= weekAgo
+          case "month":
+            const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
+            return enrolledDate >= monthAgo
+          case "year":
+            const yearAgo = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000)
+            return enrolledDate >= yearAgo
+          default:
+            return true
+        }
+      })
+    }
+
+    return filtered
+  }, [enrolledCourses, searchQuery, selectedInstructor, selectedLevel, selectedDate])
+
+  const clearFilters = () => {
+    setSearchQuery("")
+    setSelectedInstructor("all")
+    setSelectedLevel("all")
+    setSelectedDate("all")
+  }
+
   // Filter available courses to exclude already enrolled ones
-  const coursesToEnroll = useMemo(() => {
-    return availableCourses.filter((course) => !enrolledCourseIds.has(course.id))
-  }, [availableCourses, enrolledCourseIds])
+  // const coursesToEnroll = useMemo(() => {
+  //   return availableCourses.filter((course) => !enrolledCourseIds.has(course.id))
+  // }, [availableCourses, enrolledCourseIds])
 
   const canViewCourse = (enrollment: Enrollment) => {
     // Can view if payment status is "free" or "paid"
@@ -124,8 +213,8 @@ export default function StudentCoursesPage() {
         return <Badge className="bg-blue-600">Free</Badge>
       case "pending":
         return (
-          <Badge variant="secondary" className="bg-amber-100 text-amber-800">
-            <Clock className="h-3 w-3 mr-1" />
+          <Badge variant="secondary" className="bg-red-100 text-red-800">
+            <Clock className="h-3 w-3 mr-1 text-red-600" />
             Pending
           </Badge>
         )
@@ -139,22 +228,24 @@ export default function StudentCoursesPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6 px-2 sm:px-0">
       <div>
-        <h1 className="text-3xl font-bold text-slate-900">My Courses</h1>
-        <p className="text-slate-600 mt-2">Browse available courses and manage your enrollments</p>
+        <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-slate-900">My Courses</h1>
+        <p className="text-sm sm:text-base text-slate-600 mt-1 sm:mt-2">Browse available courses and manage your enrollments</p>
       </div>
 
       <Tabs defaultValue="enrolled" className="space-y-4">
         <TabsList>
           <TabsTrigger value="enrolled">
-            <GraduationCap className="h-4 w-4 mr-2" />
-            Enrolled Courses ({enrolledCourses.length})
+            <GraduationCap className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2 text-green-600" />
+            <span className="hidden sm:inline">Enrolled Courses</span>
+            <span className="sm:hidden">Enrolled</span>
+            <span className="ml-1">({filteredCourses.length})</span>
           </TabsTrigger>
-          <TabsTrigger value="available">
-            <BookOpen className="h-4 w-4 mr-2" />
+          {/* <TabsTrigger value="available">
+            <BookOpen className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2 text-green-600" />
             Available Courses ({coursesToEnroll.length})
-          </TabsTrigger>
+          </TabsTrigger> */}
         </TabsList>
 
         <TabsContent value="enrolled" className="space-y-4">
@@ -164,6 +255,76 @@ export default function StudentCoursesPage() {
               <CardDescription>Courses you have enrolled in</CardDescription>
             </CardHeader>
             <CardContent>
+              {/* Search and Filter Bar */}
+              <div className="mb-6 space-y-4">
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <div className="relative flex-1">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Search courses by title, description, or instructor..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="pl-10"
+                    />
+                  </div>
+                  {(searchQuery || selectedInstructor !== "all" || selectedLevel !== "all" || selectedDate !== "all") && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={clearFilters}
+                      className="gap-2 bg-red-800 hover:bg-red-700 text-amber-100"
+                    >
+                      <X className="h-4 w-4" />
+                      Clear Filters
+                    </Button>
+                  )}
+                </div>
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <Select value={selectedInstructor} onValueChange={setSelectedInstructor}>
+                    <SelectTrigger className="w-full sm:w-[180px]">
+                      <SelectValue placeholder="All Instructors" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Instructors</SelectItem>
+                      {instructors.map((instructor) => (
+                        <SelectItem key={instructor} value={instructor}>
+                          {instructor}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Select value={selectedLevel} onValueChange={setSelectedLevel}>
+                    <SelectTrigger className="w-full sm:w-[180px]">
+                      <SelectValue placeholder="All Levels" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Levels</SelectItem>
+                      {levels.map((level) => (
+                        <SelectItem key={level} value={level}>
+                          {level.charAt(0).toUpperCase() + level.slice(1)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Select value={selectedDate} onValueChange={setSelectedDate}>
+                    <SelectTrigger className="w-full sm:w-[180px]">
+                      <SelectValue placeholder="All Dates" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Dates</SelectItem>
+                      <SelectItem value="today">Today</SelectItem>
+                      <SelectItem value="week">Last 7 Days</SelectItem>
+                      <SelectItem value="month">Last 30 Days</SelectItem>
+                      <SelectItem value="year">Last Year</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                {filteredCourses.length !== enrolledCourses.length && (
+                  <p className="text-sm text-muted-foreground">
+                    Showing {filteredCourses.length} of {enrolledCourses.length} courses
+                  </p>
+                )}
+              </div>
               {loadingEnrollments ? (
                 <div className="flex items-center justify-center py-12">
                   <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -171,6 +332,10 @@ export default function StudentCoursesPage() {
               ) : enrolledCourses.length === 0 ? (
                 <p className="text-sm text-muted-foreground py-8 text-center">
                   You haven't enrolled in any courses yet. Browse available courses to get started!
+                </p>
+              ) : filteredCourses.length === 0 ? (
+                <p className="text-sm text-muted-foreground py-8 text-center">
+                  No courses match your search criteria. Try adjusting your filters.
                 </p>
               ) : (
                 <div className="overflow-x-auto">
@@ -187,7 +352,7 @@ export default function StudentCoursesPage() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {enrolledCourses.map((course) => {
+                      {filteredCourses.map((course) => {
                         const enrollment = course.enrollment
                         const canView = canViewCourse(enrollment)
                         return (
@@ -223,13 +388,15 @@ export default function StudentCoursesPage() {
                                   onClick={() => handleViewCourse(course.id)}
                                   className="gap-2 bg-red-800 hover:bg-red-700 text-amber-100"
                                 >
-                                  <Eye className="h-4 w-4" />
-                                  View Course
+                                  <Eye className="h-3 w-3 sm:h-4 sm:w-4 text-green-400" />
+                                  <span className="hidden sm:inline">View Course</span>
+                                  <span className="sm:hidden">View</span>
                                 </Button>
                               ) : (
-                                <div className="flex items-center justify-end gap-2 text-sm text-muted-foreground">
-                                  <Clock className="h-4 w-4" />
-                                  Waiting for approval
+                                <div className="flex items-center justify-end gap-2 text-xs sm:text-sm text-muted-foreground">
+                                  <Clock className="h-3 w-3 sm:h-4 sm:w-4 text-red-600" />
+                                  <span className="hidden sm:inline">Waiting for approval</span>
+                                  <span className="sm:hidden">Pending</span>
                                 </div>
                               )}
                             </TableCell>
@@ -244,6 +411,7 @@ export default function StudentCoursesPage() {
           </Card>
         </TabsContent>
 
+        {/* Available Courses Tab - Commented out for second version
         <TabsContent value="available" className="space-y-4">
           <Card>
             <CardHeader>
@@ -260,7 +428,7 @@ export default function StudentCoursesPage() {
                   No available courses at the moment. Check back later!
                 </p>
               ) : (
-                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
                   {coursesToEnroll.map((course) => (
                     <Card key={course.id} className="flex flex-col">
                       <CardHeader>
@@ -301,13 +469,15 @@ export default function StudentCoursesPage() {
                         >
                           {enrollingCourseId === course.id ? (
                             <>
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                              Enrolling...
+                              <Loader2 className="h-3 w-3 sm:h-4 sm:w-4 animate-spin text-green-400" />
+                              <span className="hidden sm:inline">Enrolling...</span>
+                              <span className="sm:hidden">...</span>
                             </>
                           ) : (
                             <>
-                              <GraduationCap className="h-4 w-4" />
-                              Enroll Now
+                              <GraduationCap className="h-3 w-3 sm:h-4 sm:w-4 text-green-400" />
+                              <span className="hidden sm:inline">Enroll Now</span>
+                              <span className="sm:hidden">Enroll</span>
                             </>
                           )}
                         </Button>
@@ -319,6 +489,7 @@ export default function StudentCoursesPage() {
             </CardContent>
           </Card>
         </TabsContent>
+        */}
       </Tabs>
     </div>
   )

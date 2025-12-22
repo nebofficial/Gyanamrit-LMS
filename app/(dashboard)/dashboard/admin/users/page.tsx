@@ -1,11 +1,11 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useMemo } from "react"
 import { useRouter } from "next/navigation"
 import { useForm } from "react-hook-form"
 import { z } from "zod"
 import { zodResolver } from "@hookform/resolvers/zod"
-import { Loader2, Users, Plus, Pencil, Trash2, Eye, Save } from "lucide-react"
+import { Loader2, Users, Plus, Pencil, Trash2, Eye, Save, Search, X } from "lucide-react"
 import { toast } from "sonner"
 
 import { useAuth } from "@/components/providers/auth-provider"
@@ -72,6 +72,12 @@ export default function UserManagementPage() {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false)
   const [deletingUserId, setDeletingUserId] = useState<string | null>(null)
+  
+  // Search and filter states
+  const [searchQuery, setSearchQuery] = useState("")
+  const [selectedRole, setSelectedRole] = useState<string>("all")
+  const [selectedStatus, setSelectedStatus] = useState<string>("all")
+  const [selectedDate, setSelectedDate] = useState<string>("all")
 
   const addForm = useForm<AddUserValues>({
     resolver: zodResolver(addUserSchema),
@@ -182,6 +188,67 @@ export default function UserManagementPage() {
     }
   }
 
+  // Filter users based on search and filters
+  const filteredUsers = useMemo(() => {
+    let filtered = usersData
+
+    // Search filter
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase()
+      filtered = filtered.filter(
+        (user) =>
+          user.name?.toLowerCase().includes(query) ||
+          user.email?.toLowerCase().includes(query) ||
+          user.contactNumber?.toLowerCase().includes(query) ||
+          user.country?.toLowerCase().includes(query)
+      )
+    }
+
+    // Role filter
+    if (selectedRole !== "all") {
+      filtered = filtered.filter((user) => user.role === selectedRole)
+    }
+
+    // Status filter
+    if (selectedStatus !== "all") {
+      filtered = filtered.filter((user) => user.status === selectedStatus)
+    }
+
+    // Date filter (joined date)
+    if (selectedDate !== "all") {
+      const now = new Date()
+      filtered = filtered.filter((user) => {
+        if (!user.createdAt) return false
+        const joinedDate = new Date(user.createdAt)
+        
+        switch (selectedDate) {
+          case "today":
+            return joinedDate.toDateString() === now.toDateString()
+          case "week":
+            const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+            return joinedDate >= weekAgo
+          case "month":
+            const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
+            return joinedDate >= monthAgo
+          case "year":
+            const yearAgo = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000)
+            return joinedDate >= yearAgo
+          default:
+            return true
+        }
+      })
+    }
+
+    return filtered
+  }, [usersData, searchQuery, selectedRole, selectedStatus, selectedDate])
+
+  const clearFilters = () => {
+    setSearchQuery("")
+    setSelectedRole("all")
+    setSelectedStatus("all")
+    setSelectedDate("all")
+  }
+
   const stats = {
     totalUsers: usersData.length,
     instructors: usersData.filter((item) => item.role === "instructor").length,
@@ -190,17 +257,18 @@ export default function UserManagementPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="space-y-4 sm:space-y-6 px-2 sm:px-0">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-0">
         <div>
-          <h1 className="text-3xl font-bold text-slate-900">User Management</h1>
-          <p className="text-slate-600 mt-2">Manage all platform users and their access</p>
+          <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-slate-900">User Management</h1>
+          <p className="text-sm sm:text-base text-slate-600 mt-1 sm:mt-2">Manage all platform users and their access</p>
         </div>
         <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
           <DialogTrigger asChild>
-            <Button className="gap-2 bg-red-800 hover:bg-red-700 text-amber-100">
-              <Plus className="h-4 w-4" />
-              Add User
+            <Button className="gap-2 bg-red-800 hover:bg-red-700 text-amber-100 text-sm sm:text-base">
+              <Plus className="h-3 w-3 sm:h-4 sm:w-4 text-green-400" />
+              <span className="hidden sm:inline">Add User</span>
+              <span className="sm:hidden">Add</span>
             </Button>
           </DialogTrigger>
           <DialogContent>
@@ -252,7 +320,7 @@ export default function UserManagementPage() {
         </Dialog>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <Card>
           <CardHeader>
             <CardTitle>Total Users</CardTitle>
@@ -262,7 +330,7 @@ export default function UserManagementPage() {
             {loadingUsers ? (
               <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
             ) : (
-              <p className="text-3xl font-semibold">{stats.totalUsers}</p>
+              <p className="text-2xl sm:text-3xl font-semibold">{stats.totalUsers}</p>
             )}
           </CardContent>
         </Card>
@@ -310,7 +378,7 @@ export default function UserManagementPage() {
       <Card>
         <CardHeader>
           <div className="flex items-center gap-2">
-            <Users className="h-5 w-5 text-accent" />
+            <Users className="h-4 w-4 sm:h-5 sm:w-5 text-green-600" />
             <div>
               <CardTitle>User Directory</CardTitle>
               <CardDescription>Manage access and monitor verification</CardDescription>
@@ -326,22 +394,94 @@ export default function UserManagementPage() {
           ) : usersData.length === 0 ? (
             <p className="text-sm text-muted-foreground">No users found.</p>
           ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Email</TableHead>
-                    <TableHead>Role</TableHead>
-                    <TableHead>Contact</TableHead>
-                    <TableHead>Country</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Joined</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {usersData.map((item) => (
+            <>
+              {/* Search and Filter Bar */}
+              <div className="mb-6 space-y-4">
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <div className="relative flex-1">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Search by name, email, contact, or country..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="pl-10"
+                    />
+                  </div>
+                  {(searchQuery || selectedRole !== "all" || selectedStatus !== "all" || selectedDate !== "all") && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={clearFilters}
+                      className="gap-2 bg-red-800 hover:bg-red-700 text-amber-100"
+                    >
+                      <X className="h-4 w-4" />
+                      Clear Filters
+                    </Button>
+                  )}
+                </div>
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <Select value={selectedRole} onValueChange={setSelectedRole}>
+                    <SelectTrigger className="w-full sm:w-[180px]">
+                      <SelectValue placeholder="All Roles" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Roles</SelectItem>
+                      <SelectItem value="student">Student</SelectItem>
+                      <SelectItem value="instructor">Instructor</SelectItem>
+                      <SelectItem value="admin">Admin</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Select value={selectedStatus} onValueChange={setSelectedStatus}>
+                    <SelectTrigger className="w-full sm:w-[180px]">
+                      <SelectValue placeholder="All Status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Status</SelectItem>
+                      <SelectItem value="pending">Pending</SelectItem>
+                      <SelectItem value="active">Active</SelectItem>
+                      <SelectItem value="suspended">Suspended</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Select value={selectedDate} onValueChange={setSelectedDate}>
+                    <SelectTrigger className="w-full sm:w-[180px]">
+                      <SelectValue placeholder="All Dates" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Dates</SelectItem>
+                      <SelectItem value="today">Today</SelectItem>
+                      <SelectItem value="week">Last 7 Days</SelectItem>
+                      <SelectItem value="month">Last 30 Days</SelectItem>
+                      <SelectItem value="year">Last Year</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                {filteredUsers.length !== usersData.length && (
+                  <p className="text-sm text-muted-foreground">
+                    Showing {filteredUsers.length} of {usersData.length} users
+                  </p>
+                )}
+              </div>
+              {filteredUsers.length === 0 ? (
+                <p className="text-sm text-muted-foreground py-8 text-center">
+                  No users match your search criteria. Try adjusting your filters.
+                </p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Name</TableHead>
+                        <TableHead>Email</TableHead>
+                        <TableHead>Role</TableHead>
+                        <TableHead>Contact</TableHead>
+                        <TableHead>Country</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Joined</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredUsers.map((item) => (
                     <TableRow key={item.id}>
                       <TableCell className="font-medium">{item.name}</TableCell>
                       <TableCell>{item.email}</TableCell>
@@ -377,7 +517,7 @@ export default function UserManagementPage() {
                             onClick={() => openViewDialog(item)}
                             className="h-8 w-8 p-0"
                           >
-                            <Eye className="h-4 w-4" />
+                            <Eye className="h-4 w-4 text-green-600" />
                           </Button>
                           <Button
                             size="sm"
@@ -385,7 +525,7 @@ export default function UserManagementPage() {
                             onClick={() => openEditDialog(item)}
                             className="h-8 w-8 p-0"
                           >
-                            <Pencil className="h-4 w-4" />
+                            <Pencil className="h-4 w-4 text-green-600" />
                           </Button>
                           <AlertDialog>
                             <AlertDialogTrigger asChild>
@@ -396,9 +536,9 @@ export default function UserManagementPage() {
                                 disabled={deletingUserId === item.id}
                               >
                                 {deletingUserId === item.id ? (
-                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                  <Loader2 className="h-4 w-4 animate-spin text-red-600" />
                                 ) : (
-                                  <Trash2 className="h-4 w-4" />
+                                  <Trash2 className="h-4 w-4 text-red-600" />
                                 )}
                               </Button>
                             </AlertDialogTrigger>
@@ -422,11 +562,13 @@ export default function UserManagementPage() {
                           </AlertDialog>
                         </div>
                       </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
+                      </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </>
           )}
         </CardContent>
       </Card>

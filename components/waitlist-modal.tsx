@@ -40,7 +40,7 @@ export function WaitlistModal() {
 
         <div className="grid gap-0 lg:grid-cols-2">
           <div className="flex flex-col justify-center bg-gradient-to-b from-[#2c1a3a] to-[#1a0e1f] px-6 py-8 sm:px-8 sm:py-12 lg:py-16">
-            <div className="mb-8 flex items-center gap-2 lg:mb-12">
+              <div className="mb-8 flex items-center gap-2 lg:mb-12">
               <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/20">
                 <span className="text-xl font-bold text-accent">ग</span>
               </div>

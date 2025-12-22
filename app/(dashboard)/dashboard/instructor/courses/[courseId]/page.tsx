@@ -1,8 +1,8 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useMemo } from "react"
 import { useParams, useRouter } from "next/navigation"
-import { Loader2, BookOpen, Users, GraduationCap, ArrowLeft, Plus, UserPlus } from "lucide-react"
+import { Loader2, BookOpen, Users, GraduationCap, ArrowLeft, Plus, UserPlus, Search, X } from "lucide-react"
 import { toast } from "sonner"
 
 import { useAuth } from "@/components/providers/auth-provider"
@@ -22,6 +22,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Progress } from "@/components/ui/progress"
 import { useForm } from "react-hook-form"
 import { z } from "zod"
@@ -54,6 +55,11 @@ export default function InstructorCourseDetailPage() {
   const [selectedUserIds, setSelectedUserIds] = useState<Set<string>>(new Set())
   const [loadingUsers, setLoadingUsers] = useState(false)
   const [enrollingUsers, setEnrollingUsers] = useState(false)
+  
+  // Search and filter states for enrollments
+  const [enrollmentSearchQuery, setEnrollmentSearchQuery] = useState("")
+  const [enrollmentPaymentFilter, setEnrollmentPaymentFilter] = useState<string>("all")
+  const [enrollmentDateFilter, setEnrollmentDateFilter] = useState<string>("all")
 
   const lessonSchema = z.object({
     title: z.string().min(3, "Title must be at least 3 characters"),
@@ -85,32 +91,50 @@ export default function InstructorCourseDetailPage() {
     if (!token || !params.courseId || !user?.id) return
     setLoading(true)
     try {
-      // Instructors can see their own courses even without enrollment
+      // Verify the course belongs to this instructor
       let courseData: Course | null = null
       
       try {
         const instructorCoursesRes = await dashboardService.getInstructorCourses(token)
         const foundCourse = instructorCoursesRes.data?.find((c) => c.id === params.courseId)
         
-        if (foundCourse && String(foundCourse.instructorId) === String(user.id)) {
-          courseData = foundCourse as Course
-          setCourse(courseData)
-          
-          // Try to fetch lessons for this course
+        if (!foundCourse || String(foundCourse.instructorId) !== String(user.id)) {
+          toast.error("Course not found or you do not have permission to view this course.")
+          return
+        }
+        
+        courseData = foundCourse as Course
+        setCourse(courseData)
+        
+        // Fetch full course details with lessons using getCourseById
+        // This endpoint returns course object with lessons array
+        try {
+          const courseWithLessonsRes = await courseService.getCourseById(token, params.courseId)
+          if (courseWithLessonsRes.data) {
+            // Update course data with any additional fields from the full response
+            if (courseWithLessonsRes.data.lessons && Array.isArray(courseWithLessonsRes.data.lessons)) {
+              setLessons(courseWithLessonsRes.data.lessons)
+            } else {
+              setLessons([])
+            }
+            // Update course state with full course data
+            setCourse(courseWithLessonsRes.data)
+          }
+        } catch (courseError: any) {
+          // If getCourseById fails (e.g., instructor not enrolled), try getLessonsByCourse as fallback
+          console.warn("Could not fetch course with lessons, trying lessons endpoint:", courseError)
           try {
             const lessonsRes = await lessonService.getLessonsByCourse(token, params.courseId)
             if (Array.isArray(lessonsRes.data)) {
               setLessons(lessonsRes.data)
+            } else {
+              setLessons([])
             }
           } catch (lessonError: any) {
-            // Lessons might not be available, but that's okay
+            // If both fail, set empty lessons array
             console.warn("Could not fetch lessons for instructor:", lessonError)
             setLessons([])
           }
-        } else {
-          // This course doesn't belong to the current instructor
-          toast.error("Course not found or you do not have permission to view this course.")
-          return
         }
       } catch (error) {
         console.error("Failed to fetch course:", error)
@@ -180,22 +204,23 @@ export default function InstructorCourseDetailPage() {
       
       // Refresh the lessons list
       try {
-        const lessonsRes = await lessonService.getLessonsByCourse(token, params.courseId)
-        if (Array.isArray(lessonsRes.data)) {
-          setLessons(lessonsRes.data)
+        // Try to get full course with lessons first
+        const courseRes = await courseService.getCourseById(token, params.courseId)
+        if (courseRes.data?.lessons && Array.isArray(courseRes.data.lessons)) {
+          setLessons(courseRes.data.lessons)
+        } else {
+          // Fallback to lessons endpoint
+          const lessonsRes = await lessonService.getLessonsByCourse(token, params.courseId)
+          if (Array.isArray(lessonsRes.data)) {
+            setLessons(lessonsRes.data)
+          } else {
+            setLessons([])
+          }
         }
       } catch (err) {
-        // If that fails, try refreshing the full course data
-        try {
-          const courseRes = await courseService.getCourseById(token, params.courseId)
-          if (courseRes.data?.lessons && Array.isArray(courseRes.data.lessons)) {
-            setLessons(courseRes.data.lessons)
-          } else {
-            fetchCourseData()
-          }
-        } catch (courseErr) {
-          fetchCourseData()
-        }
+        // If both fail, refresh the full course data
+        console.warn("Failed to refresh lessons after adding:", err)
+        fetchCourseData()
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unable to add lesson."
@@ -278,10 +303,63 @@ export default function InstructorCourseDetailPage() {
     }
   }
 
+  // Filter enrollments based on search and filters
+  const filteredEnrollments = useMemo(() => {
+    let filtered = enrollments
+
+    // Search filter
+    if (enrollmentSearchQuery.trim()) {
+      const query = enrollmentSearchQuery.toLowerCase()
+      filtered = filtered.filter(
+        (enrollment) =>
+          enrollment.user?.name?.toLowerCase().includes(query) ||
+          enrollment.user?.email?.toLowerCase().includes(query)
+      )
+    }
+
+    // Payment status filter
+    if (enrollmentPaymentFilter !== "all") {
+      filtered = filtered.filter((enrollment) => enrollment.paymentStatus === enrollmentPaymentFilter)
+    }
+
+    // Date filter (enrollment date)
+    if (enrollmentDateFilter !== "all") {
+      const now = new Date()
+      filtered = filtered.filter((enrollment) => {
+        if (!enrollment.enrolledAt) return false
+        const enrolledDate = new Date(enrollment.enrolledAt)
+        
+        switch (enrollmentDateFilter) {
+          case "today":
+            return enrolledDate.toDateString() === now.toDateString()
+          case "week":
+            const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+            return enrolledDate >= weekAgo
+          case "month":
+            const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
+            return enrolledDate >= monthAgo
+          case "year":
+            const yearAgo = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000)
+            return enrolledDate >= yearAgo
+          default:
+            return true
+        }
+      })
+    }
+
+    return filtered
+  }, [enrollments, enrollmentSearchQuery, enrollmentPaymentFilter, enrollmentDateFilter])
+
+  const clearEnrollmentFilters = () => {
+    setEnrollmentSearchQuery("")
+    setEnrollmentPaymentFilter("all")
+    setEnrollmentDateFilter("all")
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        <Loader2 className="h-8 w-8 animate-spin text-green-600" />
       </div>
     )
   }
@@ -298,19 +376,19 @@ export default function InstructorCourseDetailPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center gap-4">
-        <Button variant="ghost" size="sm" onClick={() => router.back()}>
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          Back
+    <div className="space-y-4 sm:space-y-6 px-2 sm:px-0">
+      <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
+        <Button variant="ghost" size="sm" onClick={() => router.back()} className="self-start">
+          <ArrowLeft className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2 text-green-600" />
+          <span className="hidden sm:inline">Back</span>
         </Button>
         <div>
-          <h1 className="text-3xl font-bold text-slate-900">{course.title}</h1>
-          <p className="text-slate-600 mt-1">{course.description}</p>
+          <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-slate-900">{course.title}</h1>
+          <p className="text-xs sm:text-sm md:text-base text-slate-600 mt-1">{course.description}</p>
         </div>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <Card>
           <CardHeader>
             <CardTitle className="text-sm">Status</CardTitle>
@@ -359,20 +437,28 @@ export default function InstructorCourseDetailPage() {
       </div>
 
       <Tabs defaultValue="lessons" className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="lessons">
-            <BookOpen className="h-4 w-4 mr-2" />
-            Lessons ({lessons.length})
-          </TabsTrigger>
-          <TabsTrigger value="enrollments">
-            <GraduationCap className="h-4 w-4 mr-2" />
-            Enrollments ({enrollments.length})
-          </TabsTrigger>
-          <TabsTrigger value="students">
-            <Users className="h-4 w-4 mr-2" />
-            Enrolled Students ({enrollments.length})
-          </TabsTrigger>
-        </TabsList>
+        <div className="overflow-x-auto -mx-2 sm:mx-0 px-2 sm:px-0">
+          <TabsList className="inline-flex min-w-full sm:min-w-0">
+            <TabsTrigger value="lessons" className="whitespace-nowrap">
+              <BookOpen className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2 text-green-600" />
+              <span className="hidden sm:inline">Lessons</span>
+              <span className="sm:hidden">Lessons</span>
+              <span className="ml-1">({lessons.length})</span>
+            </TabsTrigger>
+            <TabsTrigger value="enrollments" className="whitespace-nowrap">
+              <GraduationCap className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2 text-green-600" />
+              <span className="hidden sm:inline">Enrollments</span>
+              <span className="sm:hidden">Enroll</span>
+              <span className="ml-1">({enrollments.length})</span>
+            </TabsTrigger>
+            <TabsTrigger value="students" className="whitespace-nowrap">
+              <Users className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2 text-green-600" />
+              <span className="hidden sm:inline">Enrolled Students</span>
+              <span className="sm:hidden">Students</span>
+              <span className="ml-1">({enrollments.length})</span>
+            </TabsTrigger>
+          </TabsList>
+        </div>
 
         <TabsContent value="lessons">
           <Card>
@@ -386,8 +472,9 @@ export default function InstructorCourseDetailPage() {
                   onClick={() => setIsAddLessonDialogOpen(true)}
                   className="gap-2 bg-red-800 hover:bg-red-700 text-amber-100"
                 >
-                  <Plus className="h-4 w-4" />
-                  Add Lesson
+                  <Plus className="h-3 w-3 sm:h-4 sm:w-4 text-green-400" />
+                  <span className="hidden sm:inline">Add Lesson</span>
+                  <span className="sm:hidden">Add</span>
                 </Button>
               </div>
             </CardHeader>
@@ -409,7 +496,7 @@ export default function InstructorCourseDetailPage() {
                       </div>
                       {lesson.videoUrl && (
                         <Badge variant="outline" className="gap-1">
-                          <BookOpen className="h-3 w-3" />
+                          <BookOpen className="h-3 w-3 text-green-600" />
                           Video
                         </Badge>
                       )}
@@ -436,13 +523,14 @@ export default function InstructorCourseDetailPage() {
                   }}
                   className="gap-2 bg-red-800 hover:bg-red-700 text-amber-100"
                 >
-                  <UserPlus className="h-4 w-4" />
-                  Add Enrollment
+                  <UserPlus className="h-3 w-3 sm:h-4 sm:w-4 text-green-400" />
+                  <span className="hidden sm:inline">Add Enrollment</span>
+                  <span className="sm:hidden">Add</span>
                 </Button>
               </div>
             </CardHeader>
             <CardContent>
-              <div className="grid gap-4 md:grid-cols-3">
+              <div className="grid gap-4 md:grid-cols-3 mb-6">
                 <div>
                   <p className="text-sm text-muted-foreground">Total Enrollments</p>
                   <p className="text-2xl font-semibold">{enrollments.length}</p>
@@ -460,6 +548,63 @@ export default function InstructorCourseDetailPage() {
                   </p>
                 </div>
               </div>
+              {enrollments.length > 0 && (
+                <>
+                  {/* Search and Filter Bar */}
+                  <div className="mb-6 space-y-4">
+                    <div className="flex flex-col sm:flex-row gap-3">
+                      <div className="relative flex-1">
+                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                        <Input
+                          placeholder="Search by student name or email..."
+                          value={enrollmentSearchQuery}
+                          onChange={(e) => setEnrollmentSearchQuery(e.target.value)}
+                          className="pl-10"
+                        />
+                      </div>
+                      <Select value={enrollmentPaymentFilter} onValueChange={setEnrollmentPaymentFilter}>
+                        <SelectTrigger className="w-full sm:w-[180px]">
+                          <SelectValue placeholder="All Payment Status" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All Status</SelectItem>
+                          <SelectItem value="paid">Paid</SelectItem>
+                          <SelectItem value="free">Free</SelectItem>
+                          <SelectItem value="pending">Pending</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <Select value={enrollmentDateFilter} onValueChange={setEnrollmentDateFilter}>
+                        <SelectTrigger className="w-full sm:w-[180px]">
+                          <SelectValue placeholder="All Dates" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All Dates</SelectItem>
+                          <SelectItem value="today">Today</SelectItem>
+                          <SelectItem value="week">Last 7 Days</SelectItem>
+                          <SelectItem value="month">Last 30 Days</SelectItem>
+                          <SelectItem value="year">Last Year</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      {(enrollmentSearchQuery || enrollmentPaymentFilter !== "all" || enrollmentDateFilter !== "all") && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={clearEnrollmentFilters}
+                          className="gap-2 bg-red-800 hover:bg-red-700 text-amber-100"
+                        >
+                          <X className="h-4 w-4" />
+                          Clear
+                        </Button>
+                      )}
+                    </div>
+                    {filteredEnrollments.length !== enrollments.length && (
+                      <p className="text-sm text-muted-foreground">
+                        Showing {filteredEnrollments.length} of {enrollments.length} enrollments
+                      </p>
+                    )}
+                  </div>
+                </>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -474,19 +619,78 @@ export default function InstructorCourseDetailPage() {
               {enrollments.length === 0 ? (
                 <p className="text-sm text-muted-foreground">No students enrolled yet.</p>
               ) : (
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Student Name</TableHead>
-                        <TableHead>Email</TableHead>
-                        <TableHead>Progress</TableHead>
-                        <TableHead>Payment Status</TableHead>
-                        <TableHead>Enrolled Date</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {enrollments.map((enrollment) => (
+                <>
+                  {/* Search and Filter Bar */}
+                  <div className="mb-6 space-y-4">
+                    <div className="flex flex-col sm:flex-row gap-3">
+                      <div className="relative flex-1">
+                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                        <Input
+                          placeholder="Search by student name or email..."
+                          value={enrollmentSearchQuery}
+                          onChange={(e) => setEnrollmentSearchQuery(e.target.value)}
+                          className="pl-10"
+                        />
+                      </div>
+                      <Select value={enrollmentPaymentFilter} onValueChange={setEnrollmentPaymentFilter}>
+                        <SelectTrigger className="w-full sm:w-[180px]">
+                          <SelectValue placeholder="All Payment Status" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All Status</SelectItem>
+                          <SelectItem value="paid">Paid</SelectItem>
+                          <SelectItem value="free">Free</SelectItem>
+                          <SelectItem value="pending">Pending</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <Select value={enrollmentDateFilter} onValueChange={setEnrollmentDateFilter}>
+                        <SelectTrigger className="w-full sm:w-[180px]">
+                          <SelectValue placeholder="All Dates" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All Dates</SelectItem>
+                          <SelectItem value="today">Today</SelectItem>
+                          <SelectItem value="week">Last 7 Days</SelectItem>
+                          <SelectItem value="month">Last 30 Days</SelectItem>
+                          <SelectItem value="year">Last Year</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      {(enrollmentSearchQuery || enrollmentPaymentFilter !== "all" || enrollmentDateFilter !== "all") && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={clearEnrollmentFilters}
+                          className="gap-2 bg-red-800 hover:bg-red-700 text-amber-100"
+                        >
+                          <X className="h-4 w-4" />
+                          Clear
+                        </Button>
+                      )}
+                    </div>
+                    {filteredEnrollments.length !== enrollments.length && (
+                      <p className="text-sm text-muted-foreground">
+                        Showing {filteredEnrollments.length} of {enrollments.length} students
+                      </p>
+                    )}
+                  </div>
+                  {filteredEnrollments.length === 0 ? (
+                    <p className="text-sm text-muted-foreground py-8 text-center">
+                      No students match your search criteria. Try adjusting your filters.
+                    </p>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Student Name</TableHead>
+                            <TableHead>Email</TableHead>
+                            <TableHead>Progress</TableHead>
+                            <TableHead>Payment Status</TableHead>
+                            <TableHead>Enrolled Date</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {filteredEnrollments.map((enrollment) => (
                         <TableRow key={enrollment.id}>
                           <TableCell className="font-medium">{enrollment.user?.name ?? "—"}</TableCell>
                           <TableCell>{enrollment.user?.email ?? "—"}</TableCell>
@@ -520,11 +724,13 @@ export default function InstructorCourseDetailPage() {
                               ? new Date(enrollment.enrolledAt).toLocaleDateString()
                               : "—"}
                           </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
+                          </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  )}
+                </>
               )}
             </CardContent>
           </Card>
@@ -656,7 +862,7 @@ export default function InstructorCourseDetailPage() {
           <div className="space-y-4">
             {loadingUsers ? (
               <div className="flex items-center justify-center py-12">
-                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                <Loader2 className="h-8 w-8 animate-spin text-green-600" />
               </div>
             ) : allUsers.length === 0 ? (
               <p className="text-sm text-muted-foreground text-center py-8">
@@ -710,13 +916,15 @@ export default function InstructorCourseDetailPage() {
             >
               {enrollingUsers ? (
                 <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Enrolling...
+                  <Loader2 className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2 animate-spin text-green-400" />
+                  <span className="hidden sm:inline">Enrolling...</span>
+                  <span className="sm:hidden">...</span>
                 </>
               ) : (
                 <>
-                  <UserPlus className="h-4 w-4 mr-2" />
-                  Save Enrollment ({selectedUserIds.size})
+                  <UserPlus className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2 text-green-400" />
+                  <span className="hidden sm:inline">Save Enrollment ({selectedUserIds.size})</span>
+                  <span className="sm:hidden">Save ({selectedUserIds.size})</span>
                 </>
               )}
             </Button>

@@ -23,7 +23,7 @@ export default function AboutPage() {
         </div>
       </section>
 
-      <section className="py-12 md:py-20 bg-accent/5">
+  <section className="py-12 md:py-20 bg-accent/5">
         <div className="container mx-auto px-4 md:px-6 max-w-6xl">
           <div className="grid md:grid-cols-2 gap-8 items-center">
             <div>
@@ -41,7 +41,7 @@ export default function AboutPage() {
             <div className="relative h-64 xs:h-72 sm:h-80 md:h-96 flex items-center justify-center">
               <div className="w-full h-full">
                 <ImageSlider className="h-full w-full" />
-              </div>
+          </div>
             </div>
           </div>
         </div>

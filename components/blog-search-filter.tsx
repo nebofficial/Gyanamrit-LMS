@@ -33,18 +33,19 @@ export function BlogSearchFilter({ posts, onFiltered }: { posts: Post[]; onFilte
   }
 
   return (
-    <div className="mb-6">
-      <div className="flex gap-3">
+    <div className="mb-6 space-y-4">
+      {/* Search and Filter Row */}
+      <div className="flex flex-col sm:flex-row gap-3">
         <input
           value={query}
           onChange={(e) => onQueryChange(e.target.value)}
           placeholder="Search posts..."
-          className="flex-1 px-4 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-accent"
+          className="flex-1 px-4 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-accent transition-all"
         />
         <select
           value={activeTag ?? ""}
           onChange={(e) => onTagClick(e.target.value || "")}
-          className="px-3 py-2 border border-border rounded-lg bg-white"
+          className="w-full sm:w-auto sm:min-w-[180px] px-4 py-2 border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-accent transition-all"
         >
           <option value="">All tags</option>
           {tags.map((t) => (
@@ -55,17 +56,24 @@ export function BlogSearchFilter({ posts, onFiltered }: { posts: Post[]; onFilte
         </select>
       </div>
 
-      <div className="mt-3 flex gap-2 flex-wrap">
-        {tags.map((t) => (
-          <button
-            key={t}
-            onClick={() => onTagClick(t)}
-            className={`px-3 py-1 text-sm rounded ${activeTag === t ? "bg-accent text-white" : "bg-accent/10 text-accent"}`}
-          >
-            {t}
-          </button>
-        ))}
-      </div>
+      {/* Tag Buttons */}
+      {tags.length > 0 && (
+        <div className="flex gap-2 flex-wrap overflow-x-auto pb-2 scroll-smooth">
+          {tags.map((t) => (
+            <button
+              key={t}
+              onClick={() => onTagClick(t)}
+              className={`px-3 py-1.5 text-sm rounded-md whitespace-nowrap flex-shrink-0 transition-all ${
+                activeTag === t
+                  ? "bg-accent text-white shadow-sm"
+                  : "bg-accent/10 text-accent hover:bg-accent/20"
+              }`}
+            >
+              {t}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   )
 }

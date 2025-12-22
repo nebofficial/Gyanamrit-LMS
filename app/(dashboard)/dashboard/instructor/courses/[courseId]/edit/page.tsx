@@ -163,21 +163,21 @@ export default function InstructorEditCoursePage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        <Loader2 className="h-8 w-8 animate-spin text-green-600" />
       </div>
     )
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center gap-4">
-        <Button variant="ghost" size="sm" onClick={() => router.back()}>
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          Back
+    <div className="space-y-4 sm:space-y-6 px-2 sm:px-0">
+      <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
+        <Button variant="ghost" size="sm" onClick={() => router.back()} className="self-start">
+          <ArrowLeft className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2 text-green-600" />
+          <span className="hidden sm:inline">Back</span>
         </Button>
         <div>
-          <h1 className="text-3xl font-bold text-slate-900">Edit Course</h1>
-          <p className="text-slate-600 mt-1">Update course information (status will be set to pending)</p>
+          <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-slate-900">Edit Course</h1>
+          <p className="text-xs sm:text-sm md:text-base text-slate-600 mt-1">Update course information (status will be set to pending)</p>
         </div>
       </div>
 

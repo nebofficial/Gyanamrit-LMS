@@ -13,12 +13,13 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Textarea } from "@/components/ui/textarea"
 import { useAuth } from "@/components/providers/auth-provider"
 import * as categoryService from "@/lib/category-service"
 import type { Category } from "@/lib/category-service"
-import { Loader2, Pencil, PlusCircle, RefreshCw, Trash2 } from "lucide-react"
+import { Loader2, Pencil, PlusCircle, RefreshCw, Trash2, Search, X } from "lucide-react"
 
 const categorySchema = z.object({
   name: z.string().min(2, "Category name is required"),
@@ -57,6 +58,10 @@ export function CategoryManagement({ title = "Category Management", canManage = 
   const [deleteCategory, setDeleteCategory] = useState<Category | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
+  
+  // Search and filter states
+  const [searchQuery, setSearchQuery] = useState("")
+  const [selectedStatus, setSelectedStatus] = useState<string>("all")
 
   const addForm = useForm<CategoryFormValues>({
     resolver: zodResolver(categorySchema),
@@ -179,17 +184,47 @@ export function CategoryManagement({ title = "Category Management", canManage = 
     }
   }
 
+  // Filter categories based on search and filters
+  const filteredCategories = useMemo(() => {
+    let filtered = categories
+
+    // Search filter
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase()
+      filtered = filtered.filter(
+        (category) =>
+          category.name?.toLowerCase().includes(query) ||
+          category.slug?.toLowerCase().includes(query) ||
+          category.description?.toLowerCase().includes(query)
+      )
+    }
+
+    // Status filter
+    if (selectedStatus !== "all") {
+      const isActive = selectedStatus === "active"
+      filtered = filtered.filter((category) => category.isActive === isActive)
+    }
+
+    return filtered
+  }, [categories, searchQuery, selectedStatus])
+
+  const clearFilters = () => {
+    setSearchQuery("")
+    setSelectedStatus("all")
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold text-slate-900">{title}</h1>
-          <p className="text-sm text-muted-foreground">Create, update, delete, and view all course categories.</p>
+          <h1 className="text-xl sm:text-2xl font-semibold text-slate-900">{title}</h1>
+          <p className="text-xs sm:text-sm text-muted-foreground">Create, update, delete, and view all course categories.</p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={fetchCategories} disabled={refreshing}>
-            {refreshing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
-            Refresh
+          <Button variant="outline" size="sm" onClick={fetchCategories} disabled={refreshing} className="text-xs sm:text-sm">
+            {refreshing ? <Loader2 className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4 animate-spin text-green-600" /> : <RefreshCw className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4 text-green-600" />}
+            <span className="hidden sm:inline">Refresh</span>
+            <span className="sm:hidden">Refresh</span>
           </Button>
           {canManage && (
             <Dialog open={isAddDialogOpen} onOpenChange={(open) => {
@@ -199,9 +234,10 @@ export function CategoryManagement({ title = "Category Management", canManage = 
               }
             }}>
               <DialogTrigger asChild>
-                <Button size="sm">
-                  <PlusCircle className="mr-2 h-4 w-4" />
-                  Add Category
+                <Button size="sm" className="text-xs sm:text-sm">
+                  <PlusCircle className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4 text-green-600" />
+                  <span className="hidden sm:inline">Add Category</span>
+                  <span className="sm:hidden">Add</span>
                 </Button>
               </DialogTrigger>
               <DialogContent className="max-w-lg">
@@ -271,7 +307,7 @@ export function CategoryManagement({ title = "Category Management", canManage = 
                         Cancel
                       </Button>
                       <Button type="submit" disabled={submitting}>
-                        {submitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                        {submitting ? <Loader2 className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4 animate-spin text-green-600" /> : null}
                         Save Category
                       </Button>
                     </DialogFooter>
@@ -290,26 +326,67 @@ export function CategoryManagement({ title = "Category Management", canManage = 
         <CardContent>
           {loading ? (
             <div className="flex h-32 items-center justify-center">
-              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              <Loader2 className="h-6 w-6 animate-spin text-green-600" />
             </div>
           ) : categories.length === 0 ? (
             <div className="rounded-md border border-dashed p-8 text-center">
               <p className="text-sm text-muted-foreground">No categories found.</p>
-              {canManage && <p className="text-xs text-muted-foreground">Use the “Add Category” button to create one.</p>}
+              {canManage && <p className="text-xs text-muted-foreground">Use the "Add Category" button to create one.</p>}
             </div>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Slug</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Description</TableHead>
-                  {canManage && <TableHead className="w-[120px] text-right">Actions</TableHead>}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {categories.map((category) => (
+            <>
+              {/* Search and Filter Bar */}
+              <div className="mb-6 space-y-4">
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <div className="relative flex-1">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Search by name, slug, or description..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="pl-10"
+                    />
+                  </div>
+                  <Select value={selectedStatus} onValueChange={setSelectedStatus}>
+                    <SelectTrigger className="w-full sm:w-[180px]">
+                      <SelectValue placeholder="All Status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Status</SelectItem>
+                      <SelectItem value="active">Active</SelectItem>
+                      <SelectItem value="inactive">Inactive</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {(searchQuery || selectedStatus !== "all") && (
+                    <Button variant="outline" onClick={clearFilters} className="gap-2 bg-red-600 hover:bg-red-700">
+                      <X className="h-4 w-4" />
+                      Clear Filters
+                    </Button>
+                  )}
+                </div>
+                {filteredCategories.length !== categories.length && (
+                  <p className="text-sm text-muted-foreground">
+                    Showing {filteredCategories.length} of {categories.length} categories
+                  </p>
+                )}
+              </div>
+              {filteredCategories.length === 0 ? (
+                <p className="text-sm text-muted-foreground py-8 text-center">
+                  No categories match your search criteria. Try adjusting your filters.
+                </p>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Slug</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Description</TableHead>
+                      {canManage && <TableHead className="w-[120px] text-right">Actions</TableHead>}
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredCategories.map((category) => (
                   <TableRow key={category.id}>
                     <TableCell className="font-medium">{category.name}</TableCell>
                     <TableCell className="text-sm text-muted-foreground">{category.slug ?? "—"}</TableCell>
@@ -328,7 +405,7 @@ export function CategoryManagement({ title = "Category Management", canManage = 
                             onClick={() => setEditCategory(category)}
                             aria-label={`Edit ${category.name}`}
                           >
-                            <Pencil className="h-4 w-4" />
+                            <Pencil className="h-3 w-3 sm:h-4 sm:w-4 text-green-600" />
                           </Button>
                           <Button
                             variant="ghost"
@@ -336,15 +413,17 @@ export function CategoryManagement({ title = "Category Management", canManage = 
                             onClick={() => setDeleteCategory(category)}
                             aria-label={`Delete ${category.name}`}
                           >
-                            <Trash2 className="h-4 w-4 text-red-600" />
+                            <Trash2 className="h-3 w-3 sm:h-4 sm:w-4 text-red-600" />
                           </Button>
                         </div>
                       </TableCell>
                     )}
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                    </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </>
           )}
         </CardContent>
       </Card>

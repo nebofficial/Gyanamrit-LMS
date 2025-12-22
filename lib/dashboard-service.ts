@@ -70,7 +70,8 @@ export async function deleteCourse(token: string, courseId: string) {
   })
 }
 
-export async function addEnrollment(token: string, payload: { userId: string; courseId: string }) {
+export async function addEnrollment(token: string, payload: { userId: string; courseId: string; paymentStatus?: string }) {
+  // Backend endpoint: POST /enrollment (ADMIN only)
   return apiFetch<{ status: string; message: string; data: Enrollment }>('/enrollment', {
     method: 'POST',
     token,
@@ -79,8 +80,9 @@ export async function addEnrollment(token: string, payload: { userId: string; co
 }
 
 export async function updateEnrollment(token: string, enrollmentId: string, payload: { progress?: number; paymentStatus?: string }) {
-  return apiFetch<{ status: string; message: string; data: Enrollment }>(`/enrollment/${enrollmentId}`, {
-    method: 'PATCH',
+  // Backend endpoint: PUT /enrollment/:enrollId
+  return apiFetch<{ status: string; message: string }>(`/enrollment/${enrollmentId}`, {
+    method: 'PUT',
     token,
     body: payload,
   })
@@ -94,30 +96,10 @@ export async function deleteEnrollment(token: string, enrollmentId: string) {
 }
 
 export async function getEnrollmentsByCourse(token: string, courseId: string) {
-  // Backend doesn't have a course-specific endpoint, so we fetch all and filter client-side
-  const allEnrollments = await apiFetch<{ status: string; data: Enrollment[] }>('/enrollment/course', {
+  // Backend endpoint: GET /enrollment/:courseId/student
+  return apiFetch<{ status: string; message: string; data: Enrollment[] }>(`/enrollment/${courseId}/student`, {
     method: 'GET',
     token,
   })
-  
-  const normalizedCourseId = String(courseId).toLowerCase().trim()
-  
-  const filtered = allEnrollments.data?.filter((e) => {
-    const enrollmentCourseId = String(e.courseId || '').toLowerCase().trim()
-    return enrollmentCourseId === normalizedCourseId
-  }) ?? []
-  
-  console.log('getEnrollmentsByCourse:', {
-    courseId,
-    normalizedCourseId,
-    totalEnrollments: allEnrollments.data?.length ?? 0,
-    filteredCount: filtered.length,
-    sampleEnrollment: allEnrollments.data?.[0],
-  })
-  
-  return {
-    ...allEnrollments,
-    data: filtered,
-  }
 }
 

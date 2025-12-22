@@ -1,4 +1,4 @@
-import type React from "react"
+import React, { Suspense } from "react"
 import type { Metadata } from "next"
 import { Geist, Geist_Mono } from "next/font/google"
 import Analytics from "@/components/analytics"
@@ -14,23 +14,21 @@ const geistMono = Geist_Mono({ subsets: ["latin"] })
 export const metadata: Metadata = {
   title: "Gyanamrit - Learn Sanskrit & Cultural Arts",
   description: "Master Sanskrit, dance, music, and traditional cultural arts through interactive online classes",
-  generator: "v0.app",
+  generator: "codecraftnepal.com",
   icons: {
     icon: [
-      {
-        url: "/icon-light-32x32.png",
-        media: "(prefers-color-scheme: light)",
-      },
-      {
-        url: "/icon-dark-32x32.png",
-        media: "(prefers-color-scheme: dark)",
-      },
       {
         url: "/icon.svg",
         type: "image/svg+xml",
       },
+      {
+        url: "/icon.svg",
+        type: "image/svg+xml",
+        sizes: "any",
+      },
     ],
-    apple: "/apple-icon.png",
+    shortcut: "/icon.svg",
+    apple: "/icon.svg",
   },
 }
 
@@ -43,8 +41,10 @@ export default function RootLayout({
     <html lang="en">
       <body className={`${geist.className} font-sans antialiased`} suppressHydrationWarning>
         <AuthProvider>
-          <WaitlistModal />
-          {children}
+          <Suspense fallback={null}>
+            <WaitlistModal />
+            {children}
+          </Suspense>
           <StickyContactButton />
           <Analytics />
           <Toaster position="top-center" />

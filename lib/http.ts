@@ -1,3 +1,5 @@
+"use client"
+
 import { API_BASE_URL } from '@/lib/constants'
 
 type ApiOptions = {
@@ -113,17 +115,32 @@ export async function apiFetch<T>(path: string, options: ApiOptions = {}): Promi
       xhr.send(body as FormData)
     })
   } else {
-  const response = await fetch(url, init)
-  const contentType = response.headers.get('content-type')
-  const isJson = contentType?.includes('application/json')
-  const data = isJson ? await response.json() : await response.text()
+    try {
+      const response = await fetch(url, init)
+      const contentType = response.headers.get('content-type')
+      const isJson = contentType?.includes('application/json')
+      const data = isJson ? await response.json() : await response.text()
 
-  if (!response.ok) {
-    const message = (isJson && (data?.message ?? data?.error)) || response.statusText || 'Request failed'
-    throw new ApiError(message, response.status, data)
-  }
+      if (!response.ok) {
+        const message = (isJson && (data?.message ?? data?.error)) || response.statusText || 'Request failed'
+        throw new ApiError(message, response.status, data)
+      }
 
-  return data as T
+      return data as T
+    } catch (error) {
+      // Handle network errors
+      if (error instanceof ApiError) {
+        throw error
+      }
+      // Handle fetch failures (network errors, CORS, etc.)
+      const errorMessage = error instanceof Error ? error.message : 'Network error'
+      console.error('API Fetch Error:', { url, method, error: errorMessage, errorObj: error })
+      throw new ApiError(
+        `Failed to fetch: ${errorMessage}. Please check if the server is running at ${API_BASE_URL}`,
+        0,
+        { originalError: error, url }
+      )
+    }
   }
 }
 

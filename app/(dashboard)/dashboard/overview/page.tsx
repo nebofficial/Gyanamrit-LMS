@@ -107,26 +107,26 @@ export default function OverviewPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6 px-2 sm:px-0">
       <div>
-        <h1 className="text-3xl font-bold text-slate-900">Overview</h1>
-        <p className="text-slate-600 mt-2">Welcome back, {user?.name ?? "User"}</p>
+        <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-slate-900">Overview</h1>
+        <p className="text-sm sm:text-base text-slate-600 mt-1 sm:mt-2">Welcome back, {user?.name ?? "User"}</p>
         {error && (
-          <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800">
+          <div className="mt-2 sm:mt-4 p-2 sm:p-3 bg-amber-50 border border-amber-200 rounded-lg text-xs sm:text-sm text-amber-800">
             {error}
           </div>
         )}
       </div>
 
       {user?.role === "admin" && (
-        <div className="grid gap-4 md:grid-cols-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
           <Card>
             <CardHeader>
               <CardTitle>Total Users</CardTitle>
               <CardDescription>All registered users</CardDescription>
             </CardHeader>
             <CardContent>
-              <p className="text-3xl font-semibold">{stats.totalUsers}</p>
+              <p className="text-2xl sm:text-3xl font-semibold">{stats.totalUsers}</p>
             </CardContent>
           </Card>
           <Card>
@@ -160,7 +160,7 @@ export default function OverviewPage() {
       )}
 
       {user?.role === "instructor" && (
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
           <Card>
             <CardHeader>
               <CardTitle>Total Courses</CardTitle>
@@ -192,7 +192,7 @@ export default function OverviewPage() {
       )}
 
       {user?.role === "student" && (
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
           <Card>
             <CardHeader>
               <CardTitle>Total Enrollments</CardTitle>
@@ -229,62 +229,62 @@ export default function OverviewPage() {
           <CardDescription>Navigate to key sections</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
             <button
               onClick={() => router.push("/dashboard/quick-action")}
-              className="p-4 border rounded-lg hover:bg-slate-50 text-left transition-colors"
+              className="p-3 sm:p-4 border rounded-lg hover:bg-slate-50 text-left transition-colors"
             >
-              <Zap className="h-5 w-5 text-amber-600 mb-2" />
-              <p className="font-medium">Quick Actions</p>
-              <p className="text-sm text-muted-foreground">Common tasks</p>
+              <Zap className="h-4 w-4 sm:h-5 sm:w-5 text-green-600 mb-2" />
+              <p className="text-sm sm:text-base font-medium">Quick Actions</p>
+              <p className="text-xs sm:text-sm text-muted-foreground">Common tasks</p>
             </button>
             {user?.role === "admin" && (
               <>
                 <button
-                  onClick={() => router.push("/dashboard/admin")}
-                  className="p-4 border rounded-lg hover:bg-slate-50 text-left transition-colors"
+                  onClick={() => router.push("/dashboard/admin/courses")}
+                  className="p-3 sm:p-4 border rounded-lg hover:bg-slate-50 text-left transition-colors"
                 >
-                  <BookOpen className="h-5 w-5 text-amber-600 mb-2" />
-                  <p className="font-medium">Course Management</p>
-                  <p className="text-sm text-muted-foreground">Manage courses</p>
+                  <BookOpen className="h-4 w-4 sm:h-5 sm:w-5 text-green-600 mb-2" />
+                  <p className="text-sm sm:text-base font-medium">Course Management</p>
+                  <p className="text-xs sm:text-sm text-muted-foreground">Manage courses</p>
                 </button>
                 <button
                   onClick={() => router.push("/dashboard/admin/users")}
-                  className="p-4 border rounded-lg hover:bg-slate-50 text-left transition-colors"
+                  className="p-3 sm:p-4 border rounded-lg hover:bg-slate-50 text-left transition-colors"
                 >
-                  <Users className="h-5 w-5 text-amber-600 mb-2" />
-                  <p className="font-medium">User Management</p>
-                  <p className="text-sm text-muted-foreground">Manage users</p>
+                  <Users className="h-4 w-4 sm:h-5 sm:w-5 text-green-600 mb-2" />
+                  <p className="text-sm sm:text-base font-medium">User Management</p>
+                  <p className="text-xs sm:text-sm text-muted-foreground">Manage users</p>
                 </button>
               </>
             )}
             {user?.role === "instructor" && (
               <button
-                onClick={() => router.push("/dashboard/instructor")}
-                className="p-4 border rounded-lg hover:bg-slate-50 text-left transition-colors"
+                onClick={() => router.push("/dashboard/instructor/courses")}
+                className="p-3 sm:p-4 border rounded-lg hover:bg-slate-50 text-left transition-colors"
               >
-                <BookOpen className="h-5 w-5 text-amber-600 mb-2" />
-                <p className="font-medium">Course Management</p>
-                <p className="text-sm text-muted-foreground">Your courses</p>
+                <BookOpen className="h-4 w-4 sm:h-5 sm:w-5 text-green-600 mb-2" />
+                <p className="text-sm sm:text-base font-medium">Course Management</p>
+                <p className="text-xs sm:text-sm text-muted-foreground">Your courses</p>
               </button>
             )}
             {user?.role === "student" && (
               <button
-                onClick={() => router.push("/dashboard/student")}
-                className="p-4 border rounded-lg hover:bg-slate-50 text-left transition-colors"
+                onClick={() => router.push("/dashboard/student/courses")}
+                className="p-3 sm:p-4 border rounded-lg hover:bg-slate-50 text-left transition-colors"
               >
-                <GraduationCap className="h-5 w-5 text-amber-600 mb-2" />
-                <p className="font-medium">My Courses</p>
-                <p className="text-sm text-muted-foreground">Your learning</p>
+                <GraduationCap className="h-4 w-4 sm:h-5 sm:w-5 text-green-600 mb-2" />
+                <p className="text-sm sm:text-base font-medium">My Courses</p>
+                <p className="text-xs sm:text-sm text-muted-foreground">Your learning</p>
               </button>
             )}
             <button
               onClick={() => router.push("/dashboard/settings")}
-              className="p-4 border rounded-lg hover:bg-slate-50 text-left transition-colors"
+              className="p-3 sm:p-4 border rounded-lg hover:bg-slate-50 text-left transition-colors"
             >
-              <LayoutDashboard className="h-5 w-5 text-amber-600 mb-2" />
-              <p className="font-medium">Settings</p>
-              <p className="text-sm text-muted-foreground">Account settings</p>
+              <LayoutDashboard className="h-4 w-4 sm:h-5 sm:w-5 text-green-600 mb-2" />
+              <p className="text-sm sm:text-base font-medium">Settings</p>
+              <p className="text-xs sm:text-sm text-muted-foreground">Account settings</p>
             </button>
           </div>
         </CardContent>

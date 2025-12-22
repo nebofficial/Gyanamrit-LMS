@@ -4,10 +4,11 @@ import { useEffect, useState } from "react"
 import { useForm } from "react-hook-form"
 import { z } from "zod"
 import { zodResolver } from "@hookform/resolvers/zod"
-import { Settings, Trash2, Save } from "lucide-react"
+import { Settings, Trash2, Save, Mail, Loader2 } from "lucide-react"
 import { toast } from "sonner"
 
 import { useAuth } from "@/components/providers/auth-provider"
+import * as authService from "@/lib/auth-service"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -31,6 +32,7 @@ type SettingsValues = z.infer<typeof settingsSchema>
 export default function SettingsPage() {
   const { user, updateProfile, deleteAccount } = useAuth()
   const [showConfirm, setShowConfirm] = useState(false)
+  const [sendingVerification, setSendingVerification] = useState(false)
 
   const form = useForm<SettingsValues>({
     resolver: zodResolver(settingsSchema),
@@ -67,6 +69,23 @@ export default function SettingsPage() {
     }
   }
 
+  const handleSendVerificationEmail = async () => {
+    if (!user?.email) {
+      toast.error("Email address not found.")
+      return
+    }
+    setSendingVerification(true)
+    try {
+      await authService.requestVerificationToken(user.email)
+      toast.success("Verification email sent! Please check your inbox.")
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unable to send verification email."
+      toast.error(message)
+    } finally {
+      setSendingVerification(false)
+    }
+  }
+
   const handleDeleteAccount = async () => {
     if (!showConfirm) {
       setShowConfirm(true)
@@ -82,16 +101,16 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6 px-2 sm:px-0">
       <div>
-        <h1 className="text-3xl font-bold text-slate-900">Settings</h1>
-        <p className="text-slate-600 mt-2">Manage your account preferences and profile information</p>
+        <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-slate-900">Settings</h1>
+        <p className="text-sm sm:text-base text-slate-600 mt-1 sm:mt-2">Manage your account preferences and profile information</p>
       </div>
 
       <Card>
-        <CardHeader>
+        <CardHeader className="p-4 sm:p-6">
           <div className="flex items-center gap-2">
-            <Settings className="h-5 w-5 text-accent" />
+            <Settings className="h-4 w-4 sm:h-5 sm:w-5 text-green-600" />
             <div>
               <CardTitle>Profile Settings</CardTitle>
               <CardDescription>Update your personal information</CardDescription>
@@ -149,10 +168,11 @@ export default function SettingsPage() {
             </div>
             <div className="flex items-center gap-3">
               <Button type="submit" disabled={form.formState.isSubmitting} className="gap-2">
-                <Save className="h-4 w-4" />
-                {form.formState.isSubmitting ? "Saving..." : "Save changes"}
+                <Save className="h-3 w-3 sm:h-4 sm:w-4 text-green-600" />
+                <span className="hidden sm:inline">{form.formState.isSubmitting ? "Saving..." : "Save changes"}</span>
+                <span className="sm:hidden">{form.formState.isSubmitting ? "Saving..." : "Save"}</span>
               </Button>
-              <Button variant="outline" type="button" onClick={() => form.reset()}>
+              <Button className="bg-red-800 hover:bg-red-700 text-amber-100" variant="outline" type="button" onClick={() => form.reset()}>
                 Reset
               </Button>
             </div>
@@ -160,13 +180,13 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
 
-      <Card>
+      <Card >
         <CardHeader>
           <CardTitle>Account Information</CardTitle>
           <CardDescription>Your account details and status</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
             <div>
               <p className="text-sm text-muted-foreground">Email</p>
               <p className="font-medium">{user?.email}</p>
@@ -177,11 +197,36 @@ export default function SettingsPage() {
                 {user?.role}
               </Badge>
             </div>
-            <div>
+            <div className="sm:col-span-2">
               <p className="text-sm text-muted-foreground">Status</p>
-              <Badge variant={user?.isEmailVerified ? "default" : "secondary"}>
-                {user?.isEmailVerified ? "Verified" : "Pending verification"}
-              </Badge>
+              <div className="flex items-center gap-2">
+                <Badge variant={user?.isEmailVerified ? "default" : "secondary"}>
+                  {user?.isEmailVerified ? "Verified" : "Pending verification"}
+                </Badge>
+                {!user?.isEmailVerified && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={handleSendVerificationEmail}
+                    disabled={sendingVerification}
+                    className="gap-1 text-xs sm:text-sm bg-red-800 hover:bg-red-700 text-amber-100"
+                  >
+                    {sendingVerification ? (
+                      <>
+                        <Loader2 className="h-3 w-3 sm:h-4 sm:w-4 animate-spin text-green-600" />
+                        <span className="hidden sm:inline">Sending...</span>
+                        <span className="sm:hidden">...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Mail className="h-3 w-3 sm:h-4 sm:w-4 text-green-600" />
+                        <span className="hidden sm:inline">Send verification link</span>
+                        <span className="sm:hidden">Send link</span>
+                      </>
+                    )}
+                  </Button>
+                )}
+              </div>
             </div>
           </div>
         </CardContent>
@@ -203,8 +248,9 @@ export default function SettingsPage() {
             {showConfirm ? (
               <div className="flex items-center gap-2">
                 <Button size="sm" variant="destructive" onClick={handleDeleteAccount} className="gap-1">
-                  <Trash2 className="h-4 w-4" />
-                  Confirm delete
+                  <Trash2 className="h-3 w-3 sm:h-4 sm:w-4 text-red-600" />
+                  <span className="hidden sm:inline">Confirm delete</span>
+                  <span className="sm:hidden">Confirm</span>
                 </Button>
                 <Button size="sm" variant="outline" onClick={() => setShowConfirm(false)}>
                   Cancel
@@ -212,8 +258,9 @@ export default function SettingsPage() {
               </div>
             ) : (
               <Button size="sm" variant="destructive" onClick={handleDeleteAccount} className="gap-1">
-                <Trash2 className="h-4 w-4" />
-                Delete account
+                <Trash2 className="h-3 w-3 sm:h-4 sm:w-4 text-red-600" />
+                <span className="hidden sm:inline">Delete account</span>
+                <span className="sm:hidden">Delete</span>
               </Button>
             )}
           </div>

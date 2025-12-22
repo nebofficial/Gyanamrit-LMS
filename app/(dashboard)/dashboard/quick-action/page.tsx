@@ -86,27 +86,27 @@ export default function QuickActionPage() {
   const actions = getQuickActions()
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6 px-2 sm:px-0">
       <div>
-        <h1 className="text-3xl font-bold text-slate-900">Quick Actions</h1>
-        <p className="text-slate-600 mt-2">Access frequently used features and tasks</p>
+        <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-slate-900">Quick Actions</h1>
+        <p className="text-sm sm:text-base text-slate-600 mt-1 sm:mt-2">Access frequently used features and tasks</p>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
         {actions.map((action, index) => (
           <Card key={index} className="hover:shadow-lg transition-shadow cursor-pointer">
-            <CardHeader>
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-amber-100 rounded-lg">
-                  <action.icon className="h-5 w-5 text-amber-600" />
+            <CardHeader className="p-3 sm:p-6">
+              <div className="flex items-center gap-2 sm:gap-3">
+                <div className="p-1.5 sm:p-2 bg-green-50 rounded-lg">
+                  <action.icon className="h-4 w-4 sm:h-5 sm:w-5 text-green-600" />
                 </div>
-                <CardTitle className="text-lg">{action.title}</CardTitle>
+                <CardTitle className="text-base sm:text-lg">{action.title}</CardTitle>
               </div>
-              <CardDescription>{action.description}</CardDescription>
+              <CardDescription className="text-xs sm:text-sm mt-1 sm:mt-2">{action.description}</CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="p-3 sm:p-6 pt-0">
               <Button
-                className="w-full bg-red-800 hover:bg-red-700 text-amber-100"
+                className="w-full bg-red-800 hover:bg-red-700 text-amber-100 text-sm sm:text-base"
                 onClick={() => router.push(action.href)}
               >
                 Go to {action.title}

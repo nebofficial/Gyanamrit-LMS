@@ -1,14 +1,16 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useMemo } from "react"
 import { useParams, useRouter } from "next/navigation"
-import { Loader2, BookOpen, ArrowLeft, Play, FileText, Image as ImageIcon } from "lucide-react"
+import { Loader2, BookOpen, ArrowLeft, Play, FileText, Image as ImageIcon, Search, X } from "lucide-react"
 import { toast } from "sonner"
 
 import { useAuth } from "@/components/providers/auth-provider"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import * as courseService from "@/lib/course-service"
 import * as lessonService from "@/lib/lesson-service"
@@ -25,6 +27,10 @@ export default function StudentCourseDetailPage() {
   const [lessons, setLessons] = useState<Lesson[]>([])
   const [enrollment, setEnrollment] = useState<Enrollment | null>(null)
   const [loading, setLoading] = useState(true)
+  
+  // Search and filter states
+  const [searchQuery, setSearchQuery] = useState("")
+  const [selectedDate, setSelectedDate] = useState<string>("all")
 
   useEffect(() => {
     if (!token || !params.courseId) return
@@ -82,10 +88,57 @@ export default function StudentCourseDetailPage() {
     return enrollment.paymentStatus === "free" || enrollment.paymentStatus === "paid"
   }
 
+  // Filter lessons based on search and date
+  const filteredLessons = useMemo(() => {
+    let filtered = lessons
+
+    // Search filter
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase()
+      filtered = filtered.filter(
+        (lesson) =>
+          lesson.title?.toLowerCase().includes(query) ||
+          lesson.description?.toLowerCase().includes(query)
+      )
+    }
+
+    // Date filter
+    if (selectedDate !== "all") {
+      const now = new Date()
+      filtered = filtered.filter((lesson) => {
+        if (!lesson.createdAt) return false
+        const lessonDate = new Date(lesson.createdAt)
+        
+        switch (selectedDate) {
+          case "today":
+            return lessonDate.toDateString() === now.toDateString()
+          case "week":
+            const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+            return lessonDate >= weekAgo
+          case "month":
+            const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
+            return lessonDate >= monthAgo
+          case "year":
+            const yearAgo = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000)
+            return lessonDate >= yearAgo
+          default:
+            return true
+        }
+      })
+    }
+
+    return filtered
+  }, [lessons, searchQuery, selectedDate])
+
+  const clearFilters = () => {
+    setSearchQuery("")
+    setSelectedDate("all")
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        <Loader2 className="h-8 w-8 animate-spin text-green-600" />
       </div>
     )
   }
@@ -115,19 +168,22 @@ export default function StudentCourseDetailPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <Button onClick={() => router.back()} variant="outline" className="mb-4 gap-2">
-        <ArrowLeft className="h-4 w-4" /> Back to Courses
+    <div className="space-y-4 sm:space-y-6 px-2 sm:px-0">
+      <Button onClick={() => router.back()} variant="outline" className="mb-2 sm:mb-4 gap-2 bg-red-800 hover:bg-red-700 text-amber-100">
+        <ArrowLeft className="h-3 w-3 sm:h-4 sm:w-4 text-green-600" />
+        <span className="hidden sm:inline">Back to Courses</span>
+        <span className="sm:hidden">Back</span>
       </Button>
 
       <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <BookOpen className="h-6 w-6" /> {course.title}
+        <CardHeader className="p-4 sm:p-6">
+          <CardTitle className="flex items-center gap-2 text-lg sm:text-xl md:text-2xl">
+            <BookOpen className="h-5 w-5 sm:h-6 sm:w-6 text-green-600" />
+            {course.title}
           </CardTitle>
-          <CardDescription>{course.description}</CardDescription>
+          <CardDescription className="text-xs sm:text-sm mt-1 sm:mt-2">{course.description}</CardDescription>
         </CardHeader>
-        <CardContent className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <CardContent className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 p-4 sm:p-6">
           <div>
             <p className="text-sm font-medium text-muted-foreground">Category</p>
             <p className="font-semibold">{course.category?.name ?? "N/A"}</p>
@@ -151,6 +207,18 @@ export default function StudentCourseDetailPage() {
             <p className="font-semibold">{course.duration ?? "N/A"}</p>
           </div>
           <div>
+            <p className="text-sm font-medium text-muted-foreground">Created Date</p>
+            <p className="font-semibold">
+              {course.createdAt
+                ? new Date(course.createdAt).toLocaleDateString("en-US", {
+                    year: "numeric",
+                    month: "long",
+                    day: "numeric",
+                  })
+                : "N/A"}
+            </p>
+          </div>
+          <div>
             <p className="text-sm font-medium text-muted-foreground">Progress</p>
             <div className="flex items-center gap-2 mt-1">
               <div className="w-32 bg-gray-200 rounded-full h-2">
@@ -166,12 +234,16 @@ export default function StudentCourseDetailPage() {
       </Card>
 
       <Tabs defaultValue="lessons" className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="lessons">
-            <BookOpen className="h-4 w-4 mr-2" />
-            Lessons ({lessons.length})
-          </TabsTrigger>
-        </TabsList>
+        <div className="overflow-x-auto -mx-2 sm:mx-0 px-2 sm:px-0">
+          <TabsList className="inline-flex min-w-full sm:min-w-0 bg-red-800 hover:bg-red-700 text-amber-100">
+            <TabsTrigger value="lessons" className="">
+              <BookOpen className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2 text-green-600" />
+              <span className="hidden sm:inline">Lessons</span>
+              <span className="sm:hidden">Lessons</span>
+              <span className="ml-1">({filteredLessons.length})</span>
+            </TabsTrigger>
+          </TabsList>
+        </div>
 
         <TabsContent value="lessons" className="space-y-4">
           <Card>
@@ -183,13 +255,64 @@ export default function StudentCourseDetailPage() {
               {lessons.length === 0 ? (
                 <p className="text-sm text-muted-foreground text-center py-8">No lessons available yet.</p>
               ) : (
-                <div className="space-y-3">
-                  {lessons.map((lesson, index) => (
+                <>
+                  {/* Search and Filter Bar */}
+                  <div className="mb-6 space-y-4">
+                    <div className="flex flex-col sm:flex-row gap-3">
+                      <div className="relative flex-1">
+                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                        <Input
+                          placeholder="Search lessons by title or description..."
+                          value={searchQuery}
+                          onChange={(e) => setSearchQuery(e.target.value)}
+                          className="pl-10"
+                        />
+                      </div>
+                      <Select value={selectedDate} onValueChange={setSelectedDate}>
+                        <SelectTrigger className="w-full sm:w-[180px]">
+                          <SelectValue placeholder="All Dates" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All Dates</SelectItem>
+                          <SelectItem value="today">Today</SelectItem>
+                          <SelectItem value="week">Last 7 Days</SelectItem>
+                          <SelectItem value="month">Last 30 Days</SelectItem>
+                          <SelectItem value="year">Last Year</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      {(searchQuery || selectedDate !== "all") && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={clearFilters}
+                          className="gap-2 bg-red-800 hover:bg-red-700 text-amber-100"
+                        >
+                          <X className="h-4 w-4" />
+                          Clear
+                        </Button>
+                      )}
+                    </div>
+                    {filteredLessons.length !== lessons.length && (
+                      <p className="text-sm text-muted-foreground">
+                        Showing {filteredLessons.length} of {lessons.length} lessons
+                      </p>
+                    )}
+                  </div>
+                  {filteredLessons.length === 0 ? (
+                    <p className="text-sm text-muted-foreground text-center py-8">
+                      No lessons match your search criteria. Try adjusting your filters.
+                    </p>
+                  ) : (
+                    <div className="space-y-3">
+                      {filteredLessons.map((lesson, index) => {
+                        // Find original index for numbering
+                        const originalIndex = lessons.findIndex((l) => l.id === lesson.id)
+                        return (
                     <Card key={lesson.id} className="hover:shadow-md transition-shadow">
                       <CardContent className="p-4">
                         <div className="flex items-start gap-4">
                           <div className="flex-shrink-0 w-10 h-10 rounded-full bg-red-100 text-red-800 flex items-center justify-center font-semibold">
-                            {index + 1}
+                            {originalIndex >= 0 ? originalIndex + 1 : index + 1}
                           </div>
                           <div className="flex-1">
                             <h4 className="font-semibold text-lg mb-1">{lesson.title}</h4>
@@ -202,10 +325,11 @@ export default function StudentCourseDetailPage() {
                                   size="sm"
                                   variant="outline"
                                   onClick={() => window.open(lesson.videoUrl, "_blank")}
-                                  className="gap-2"
+                                  className="gap-2 bg-red-800 hover:bg-red-700 text-amber-100"
                                 >
-                                  <Play className="h-4 w-4" />
-                                  Watch Video
+                                  <Play className="h-3 w-3 sm:h-4 sm:w-4 text-green-600" />
+                                  <span className="hidden sm:inline">Watch Video</span>
+                                  <span className="sm:hidden">Video</span>
                                 </Button>
                               )}
                               {lesson.fileUrl && (
@@ -213,10 +337,11 @@ export default function StudentCourseDetailPage() {
                                   size="sm"
                                   variant="outline"
                                   onClick={() => window.open(lesson.fileUrl, "_blank")}
-                                  className="gap-2"
+                                  className="gap-2 bg-red-800 hover:bg-red-700 text-amber-100"
                                 >
-                                  <FileText className="h-4 w-4" />
-                                  Download File
+                                  <FileText className="h-3 w-3 sm:h-4 sm:w-4 text-green-600" />
+                                  <span className="hidden sm:inline">Download File</span>
+                                  <span className="sm:hidden">File</span>
                                 </Button>
                               )}
                               {lesson.imageUrl && (
@@ -224,10 +349,11 @@ export default function StudentCourseDetailPage() {
                                   size="sm"
                                   variant="outline"
                                   onClick={() => window.open(lesson.imageUrl, "_blank")}
-                                  className="gap-2"
+                                  className="gap-2 bg-red-800 hover:bg-red-700 text-amber-100"
                                 >
-                                  <ImageIcon className="h-4 w-4" />
-                                  View Image
+                                  <ImageIcon className="h-3 w-3 sm:h-4 sm:w-4 text-green-600" />
+                                  <span className="hidden sm:inline">View Image</span>
+                                  <span className="sm:hidden">Image</span>
                                 </Button>
                               )}
                             </div>
@@ -235,8 +361,11 @@ export default function StudentCourseDetailPage() {
                         </div>
                       </CardContent>
                     </Card>
-                  ))}
-                </div>
+                          )
+                        })}
+                    </div>
+                  )}
+                </>
               )}
             </CardContent>
           </Card>

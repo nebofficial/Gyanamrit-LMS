@@ -1,8 +1,8 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useMemo } from "react"
 import { useParams, useRouter } from "next/navigation"
-import { Loader2, BookOpen, Users, GraduationCap, ArrowLeft, Plus, UserPlus, CreditCard, Trash2, Pencil } from "lucide-react"
+import { Loader2, BookOpen, Users, GraduationCap, ArrowLeft, Plus, UserPlus, CreditCard, Trash2, Pencil, Search, X } from "lucide-react"
 import { toast } from "sonner"
 
 import { useAuth } from "@/components/providers/auth-provider"
@@ -22,6 +22,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Progress } from "@/components/ui/progress"
 import { useForm } from "react-hook-form"
 import { z } from "zod"
@@ -62,6 +63,15 @@ export default function CourseDetailPage() {
   const [updatePaymentStatus, setUpdatePaymentStatus] = useState<string>("pending")
   const [updatingPayment, setUpdatingPayment] = useState(false)
   const [deletingEnrollment, setDeletingEnrollment] = useState<string | null>(null)
+  
+  // Search and filter states for enrollments
+  const [enrollmentSearchQuery, setEnrollmentSearchQuery] = useState("")
+  const [enrollmentPaymentFilter, setEnrollmentPaymentFilter] = useState<string>("all")
+  const [enrollmentDateFilter, setEnrollmentDateFilter] = useState<string>("all")
+  
+  // Search and filter states for lessons
+  const [lessonSearchQuery, setLessonSearchQuery] = useState("")
+  const [lessonDateFilter, setLessonDateFilter] = useState<string>("all")
 
   const lessonSchema = z.object({
     title: z.string().min(3, "Title must be at least 3 characters"),
@@ -133,37 +143,34 @@ export default function CourseDetailPage() {
         return
       }
 
-      // Lessons endpoint needs enrollment, so we skip it for now
-      // Admin can still view course details without the lessons list
-      if (courseData && (!courseData.lessons || courseData.lessons.length === 0)) {
-        setLessons([])
+      // Fetch lessons for this course (admin can access this endpoint)
+      try {
+        const lessonsRes = await lessonService.getLessonsByCourse(token, params.courseId)
+        if (Array.isArray(lessonsRes.data)) {
+          setLessons(lessonsRes.data)
+        } else {
+          setLessons([])
+        }
+      } catch (lessonsError: any) {
+        console.error("Failed to fetch lessons:", lessonsError)
+        // If lessons fetch fails, try to get from course data if available
+        if (courseData?.lessons && Array.isArray(courseData.lessons)) {
+          setLessons(courseData.lessons)
+        } else {
+          setLessons([])
+        }
       }
 
       // Fetch enrollments for this course
       try {
         const enrollmentsRes = await dashboardService.getEnrollmentsByCourse(token, params.courseId)
-        console.log('Admin enrollments response:', enrollmentsRes)
         const enrollmentData = enrollmentsRes.data ?? []
-        console.log('Setting enrollments:', enrollmentData.length, enrollmentData)
         setEnrollments(enrollmentData)
       } catch (err: any) {
-        // Enrollment endpoint might have restrictions, so try a fallback
         console.error("Failed to fetch enrollments:", err)
-        if (err?.message?.includes("enrolled") || err?.message?.includes("enrollment")) {
-          console.log("Enrollments endpoint has restrictions - trying fallback")
-        }
-        // Get all enrollments and filter manually
-        try {
-          const allEnrollmentsRes = await dashboardService.getEnrollments(token)
-          const filtered = allEnrollmentsRes.data?.filter(
-            (e) => String(e.courseId).toLowerCase() === String(params.courseId).toLowerCase()
-          ) ?? []
-          console.log('Fallback: Filtered enrollments:', filtered.length)
-          setEnrollments(filtered)
-        } catch (fallbackErr) {
-          console.error("Fallback enrollment fetch also failed:", fallbackErr)
-          setEnrollments([])
-        }
+        const errorMessage = err?.message || "Unable to load enrollments."
+        toast.error(errorMessage)
+        setEnrollments([])
       }
     } catch (error) {
       console.error("Failed to fetch course data:", error)
@@ -277,21 +284,10 @@ export default function CourseDetailPage() {
       // Refresh the enrollments list
       try {
         const enrollmentsRes = await dashboardService.getEnrollmentsByCourse(token, params.courseId)
-        console.log('Refreshed enrollments after adding:', enrollmentsRes)
         setEnrollments(enrollmentsRes.data ?? [])
       } catch (err) {
-        console.error("Failed to refresh enrollments, trying fallback:", err)
-        // Fallback: get all enrollments and filter
-        try {
-          const allEnrollmentsRes = await dashboardService.getEnrollments(token)
-          const filtered = allEnrollmentsRes.data?.filter(
-            (e) => String(e.courseId).toLowerCase() === String(params.courseId).toLowerCase()
-          ) ?? []
-          console.log('Fallback refresh: Filtered enrollments:', filtered.length)
-          setEnrollments(filtered)
-        } catch (fallbackErr) {
-          console.error("Fallback enrollment refresh also failed:", fallbackErr)
-        }
+        console.error("Failed to refresh enrollments:", err)
+        toast.error("Enrollments added but failed to refresh the list.")
       }
     } catch (error: any) {
       console.error("Enrollment error:", error)
@@ -319,16 +315,7 @@ export default function CourseDetailPage() {
         const enrollmentsRes = await dashboardService.getEnrollmentsByCourse(token, params.courseId)
         setEnrollments(enrollmentsRes.data ?? [])
       } catch (err) {
-        console.error("Failed to refresh enrollments, trying fallback:", err)
-        try {
-          const allEnrollmentsRes = await dashboardService.getEnrollments(token)
-          const filtered = allEnrollmentsRes.data?.filter(
-            (e) => String(e.courseId).toLowerCase() === String(params.courseId).toLowerCase()
-          ) ?? []
-          setEnrollments(filtered)
-        } catch (fallbackErr) {
-          console.error("Fallback enrollment refresh also failed:", fallbackErr)
-        }
+        console.error("Failed to refresh enrollments:", err)
       }
     } catch (error: any) {
       console.error("Update payment error:", error)
@@ -353,16 +340,7 @@ export default function CourseDetailPage() {
         const enrollmentsRes = await dashboardService.getEnrollmentsByCourse(token, params.courseId)
         setEnrollments(enrollmentsRes.data ?? [])
       } catch (err) {
-        console.error("Failed to refresh enrollments, trying fallback:", err)
-        try {
-          const allEnrollmentsRes = await dashboardService.getEnrollments(token)
-          const filtered = allEnrollmentsRes.data?.filter(
-            (e) => String(e.courseId).toLowerCase() === String(params.courseId).toLowerCase()
-          ) ?? []
-          setEnrollments(filtered)
-        } catch (fallbackErr) {
-          console.error("Fallback enrollment refresh also failed:", fallbackErr)
-        }
+        console.error("Failed to refresh enrollments:", err)
       }
     } catch (error: any) {
       console.error("Delete enrollment error:", error)
@@ -373,10 +351,110 @@ export default function CourseDetailPage() {
     }
   }
 
+  // Filter enrollments based on search and filters
+  const filteredEnrollments = useMemo(() => {
+    let filtered = enrollments
+
+    // Search filter
+    if (enrollmentSearchQuery.trim()) {
+      const query = enrollmentSearchQuery.toLowerCase()
+      filtered = filtered.filter(
+        (enrollment) =>
+          enrollment.user?.name?.toLowerCase().includes(query) ||
+          enrollment.user?.email?.toLowerCase().includes(query)
+      )
+    }
+
+    // Payment status filter
+    if (enrollmentPaymentFilter !== "all") {
+      filtered = filtered.filter((enrollment) => enrollment.paymentStatus === enrollmentPaymentFilter)
+    }
+
+    // Date filter (enrollment date)
+    if (enrollmentDateFilter !== "all") {
+      const now = new Date()
+      filtered = filtered.filter((enrollment) => {
+        if (!enrollment.enrolledAt) return false
+        const enrolledDate = new Date(enrollment.enrolledAt)
+        
+        switch (enrollmentDateFilter) {
+          case "today":
+            return enrolledDate.toDateString() === now.toDateString()
+          case "week":
+            const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+            return enrolledDate >= weekAgo
+          case "month":
+            const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
+            return enrolledDate >= monthAgo
+          case "year":
+            const yearAgo = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000)
+            return enrolledDate >= yearAgo
+          default:
+            return true
+        }
+      })
+    }
+
+    return filtered
+  }, [enrollments, enrollmentSearchQuery, enrollmentPaymentFilter, enrollmentDateFilter])
+
+  const clearEnrollmentFilters = () => {
+    setEnrollmentSearchQuery("")
+    setEnrollmentPaymentFilter("all")
+    setEnrollmentDateFilter("all")
+  }
+
+  // Filter lessons based on search and filters
+  const filteredLessons = useMemo(() => {
+    let filtered = lessons
+
+    // Search filter
+    if (lessonSearchQuery.trim()) {
+      const query = lessonSearchQuery.toLowerCase()
+      filtered = filtered.filter(
+        (lesson) =>
+          lesson.title?.toLowerCase().includes(query) ||
+          lesson.description?.toLowerCase().includes(query)
+      )
+    }
+
+    // Date filter (lesson creation date)
+    if (lessonDateFilter !== "all") {
+      const now = new Date()
+      filtered = filtered.filter((lesson) => {
+        if (!lesson.createdAt) return false
+        const lessonDate = new Date(lesson.createdAt)
+        
+        switch (lessonDateFilter) {
+          case "today":
+            return lessonDate.toDateString() === now.toDateString()
+          case "week":
+            const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+            return lessonDate >= weekAgo
+          case "month":
+            const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
+            return lessonDate >= monthAgo
+          case "year":
+            const yearAgo = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000)
+            return lessonDate >= yearAgo
+          default:
+            return true
+        }
+      })
+    }
+
+    return filtered
+  }, [lessons, lessonSearchQuery, lessonDateFilter])
+
+  const clearLessonFilters = () => {
+    setLessonSearchQuery("")
+    setLessonDateFilter("all")
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        <Loader2 className="h-8 w-8 animate-spin text-green-600" />
       </div>
     )
   }
@@ -393,19 +471,19 @@ export default function CourseDetailPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center gap-4">
-        <Button variant="ghost" size="sm" onClick={() => router.back()}>
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          Back
+    <div className="space-y-4 sm:space-y-6 px-2 sm:px-0">
+      <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
+        <Button variant="ghost" size="sm" onClick={() => router.back()} className="self-start">
+          <ArrowLeft className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2 text-green-600" />
+          <span className="hidden sm:inline">Back</span>
         </Button>
         <div>
-          <h1 className="text-3xl font-bold text-slate-900">{course.title}</h1>
-          <p className="text-slate-600 mt-1">{course.description}</p>
+          <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-slate-900">{course.title}</h1>
+          <p className="text-xs sm:text-sm md:text-base text-slate-600 mt-1">{course.description}</p>
         </div>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <Card>
           <CardHeader>
             <CardTitle className="text-sm">Status</CardTitle>
@@ -454,24 +532,34 @@ export default function CourseDetailPage() {
       </div>
 
       <Tabs defaultValue="lessons" className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="lessons">
-            <BookOpen className="h-4 w-4 mr-2" />
-            Lessons ({lessons.length})
-          </TabsTrigger>
-          <TabsTrigger value="enrollments">
-            <GraduationCap className="h-4 w-4 mr-2" />
-            Enrollments ({enrollments.length})
-          </TabsTrigger>
-          <TabsTrigger value="students">
-            <Users className="h-4 w-4 mr-2" />
-            Enrolled Students ({enrollments.length})
-          </TabsTrigger>
-          <TabsTrigger value="payment">
-            <CreditCard className="h-4 w-4 mr-2" />
-            Payment ({enrollments.length})
-          </TabsTrigger>
-        </TabsList>
+        <div className="overflow-x-auto -mx-2 sm:mx-0 px-2 sm:px-0">
+          <TabsList className="inline-flex min-w-full sm:min-w-0">
+            <TabsTrigger value="lessons" className="whitespace-nowrap">
+              <BookOpen className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2 text-green-600" />
+              <span className="hidden sm:inline">Lessons</span>
+              <span className="sm:hidden">Lessons</span>
+              <span className="ml-1">({lessons.length})</span>
+            </TabsTrigger>
+            <TabsTrigger value="enrollments" className="whitespace-nowrap">
+              <GraduationCap className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2 text-green-600" />
+              <span className="hidden sm:inline">Enrollments</span>
+              <span className="sm:hidden">Enroll</span>
+              <span className="ml-1">({enrollments.length})</span>
+            </TabsTrigger>
+            <TabsTrigger value="students" className="whitespace-nowrap">
+              <Users className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2 text-green-600" />
+              <span className="hidden sm:inline">Enrolled Students</span>
+              <span className="sm:hidden">Students</span>
+              <span className="ml-1">({enrollments.filter((e) => e.paymentStatus === "paid" || e.paymentStatus === "free").length})</span>
+            </TabsTrigger>
+            <TabsTrigger value="payment" className="whitespace-nowrap">
+              <CreditCard className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2 text-green-600" />
+              <span className="hidden sm:inline">Payment</span>
+              <span className="sm:hidden">Pay</span>
+              <span className="ml-1">({enrollments.length})</span>
+            </TabsTrigger>
+          </TabsList>
+        </div>
 
         <TabsContent value="lessons">
           <Card>
@@ -485,8 +573,9 @@ export default function CourseDetailPage() {
                   onClick={() => setIsAddLessonDialogOpen(true)}
                   className="gap-2 bg-red-800 hover:bg-red-700 text-amber-100"
                 >
-                  <Plus className="h-4 w-4" />
-                  Add Lesson
+                  <Plus className="h-3 w-3 sm:h-4 sm:w-4 text-green-400" />
+                  <span className="hidden sm:inline">Add Lesson</span>
+                  <span className="sm:hidden">Add</span>
                 </Button>
               </div>
             </CardHeader>
@@ -494,27 +583,80 @@ export default function CourseDetailPage() {
               {lessons.length === 0 ? (
                 <p className="text-sm text-muted-foreground">No lessons added yet.</p>
               ) : (
-                <div className="space-y-2">
-                  {lessons.map((lesson, index) => (
-                    <div key={lesson.id} className="flex items-center gap-4 p-4 border rounded-lg">
-                      <div className="flex-shrink-0 w-8 h-8 rounded-full bg-red-100 text-red-800 flex items-center justify-center font-semibold">
-                        {index + 1}
+                <>
+                  {/* Search and Filter Bar */}
+                  <div className="mb-6 space-y-4">
+                    <div className="flex flex-col sm:flex-row gap-3">
+                      <div className="relative flex-1">
+                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                        <Input
+                          placeholder="Search lessons by title or description..."
+                          value={lessonSearchQuery}
+                          onChange={(e) => setLessonSearchQuery(e.target.value)}
+                          className="pl-10"
+                        />
                       </div>
-                      <div className="flex-1">
-                        <h4 className="font-medium">{lesson.title}</h4>
-                        {lesson.description && (
-                          <p className="text-sm text-muted-foreground mt-1">{lesson.description}</p>
-                        )}
-                      </div>
-                      {lesson.videoUrl && (
-                        <Badge variant="outline" className="gap-1">
-                          <BookOpen className="h-3 w-3" />
-                          Video
-                        </Badge>
+                      <Select value={lessonDateFilter} onValueChange={setLessonDateFilter}>
+                        <SelectTrigger className="w-full sm:w-[180px]">
+                          <SelectValue placeholder="All Dates" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All Dates</SelectItem>
+                          <SelectItem value="today">Today</SelectItem>
+                          <SelectItem value="week">Last 7 Days</SelectItem>
+                          <SelectItem value="month">Last 30 Days</SelectItem>
+                          <SelectItem value="year">Last Year</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      {(lessonSearchQuery || lessonDateFilter !== "all") && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={clearLessonFilters}
+                          className="gap-2 bg-red-800 hover:bg-red-700 text-amber-100"
+                        >
+                          <X className="h-4 w-4" />
+                          Clear Filters
+                        </Button>
                       )}
                     </div>
-                  ))}
-                </div>
+                    {filteredLessons.length !== lessons.length && (
+                      <p className="text-sm text-muted-foreground">
+                        Showing {filteredLessons.length} of {lessons.length} lessons
+                      </p>
+                    )}
+                  </div>
+                  {filteredLessons.length === 0 ? (
+                    <p className="text-sm text-muted-foreground py-8 text-center">
+                      No lessons match your search criteria. Try adjusting your filters.
+                    </p>
+                  ) : (
+                    <div className="space-y-2">
+                      {filteredLessons.map((lesson, index) => {
+                        const originalIndex = lessons.findIndex((l) => l.id === lesson.id)
+                        return (
+                          <div key={lesson.id} className="flex items-center gap-4 p-4 border rounded-lg">
+                            <div className="flex-shrink-0 w-8 h-8 rounded-full bg-red-100 text-red-800 flex items-center justify-center font-semibold">
+                              {originalIndex + 1}
+                            </div>
+                            <div className="flex-1">
+                              <h4 className="font-medium">{lesson.title}</h4>
+                              {lesson.description && (
+                                <p className="text-sm text-muted-foreground mt-1">{lesson.description}</p>
+                              )}
+                            </div>
+                            {lesson.videoUrl && (
+                              <Badge variant="outline" className="gap-1">
+                                <BookOpen className="h-3 w-3 text-green-600" />
+                                Video
+                              </Badge>
+                            )}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
+                </>
               )}
             </CardContent>
           </Card>
@@ -535,13 +677,14 @@ export default function CourseDetailPage() {
                   }}
                   className="gap-2 bg-red-800 hover:bg-red-700 text-amber-100"
                 >
-                  <UserPlus className="h-4 w-4" />
-                  Add Enrollment
+                  <UserPlus className="h-3 w-3 sm:h-4 sm:w-4 text-green-400" />
+                  <span className="hidden sm:inline">Add Enrollment</span>
+                  <span className="sm:hidden">Add</span>
                 </Button>
               </div>
             </CardHeader>
             <CardContent>
-              <div className="grid gap-4 md:grid-cols-3">
+              <div className="grid gap-4 md:grid-cols-3 mb-6">
                 <div>
                   <p className="text-sm text-muted-foreground">Total Enrollments</p>
                   <p className="text-2xl font-semibold">{enrollments.length}</p>
@@ -559,6 +702,127 @@ export default function CourseDetailPage() {
                   </p>
                 </div>
               </div>
+              {enrollments.length === 0 ? (
+                <p className="text-sm text-muted-foreground py-8 text-center">
+                  No enrollments found for this course.
+                </p>
+              ) : (
+                <>
+                  {/* Search and Filter Bar */}
+                  <div className="mb-6 space-y-4">
+                    <div className="flex flex-col sm:flex-row gap-3">
+                      <div className="relative flex-1">
+                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                        <Input
+                          placeholder="Search by student name or email..."
+                          value={enrollmentSearchQuery}
+                          onChange={(e) => setEnrollmentSearchQuery(e.target.value)}
+                          className="pl-10"
+                        />
+                      </div>
+                      <Select value={enrollmentPaymentFilter} onValueChange={setEnrollmentPaymentFilter}>
+                        <SelectTrigger className="w-full sm:w-[180px]">
+                          <SelectValue placeholder="All Payment Status" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All Status</SelectItem>
+                          <SelectItem value="paid">Paid</SelectItem>
+                          <SelectItem value="free">Free</SelectItem>
+                          <SelectItem value="pending">Pending</SelectItem>
+                          <SelectItem value="refund">Refund</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <Select value={enrollmentDateFilter} onValueChange={setEnrollmentDateFilter}>
+                        <SelectTrigger className="w-full sm:w-[180px]">
+                          <SelectValue placeholder="All Dates" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All Dates</SelectItem>
+                          <SelectItem value="today">Today</SelectItem>
+                          <SelectItem value="week">Last 7 Days</SelectItem>
+                          <SelectItem value="month">Last 30 Days</SelectItem>
+                          <SelectItem value="year">Last Year</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      {(enrollmentSearchQuery || enrollmentPaymentFilter !== "all" || enrollmentDateFilter !== "all") && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={clearEnrollmentFilters}
+                          className="gap-2 bg-red-800 hover:bg-red-700 text-amber-100"
+                        >
+                          <X className="h-4 w-4" />
+                          Clear
+                        </Button>
+                      )}
+                    </div>
+                    {filteredEnrollments.length !== enrollments.length && (
+                      <p className="text-sm text-muted-foreground">
+                        Showing {filteredEnrollments.length} of {enrollments.length} enrollments
+                      </p>
+                    )}
+                  </div>
+                  {filteredEnrollments.length === 0 ? (
+                    <p className="text-sm text-muted-foreground py-8 text-center">
+                      No enrollments match your search criteria. Try adjusting your filters.
+                    </p>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Student Name</TableHead>
+                            <TableHead>Email</TableHead>
+                            <TableHead>Progress</TableHead>
+                            <TableHead>Payment Status</TableHead>
+                            <TableHead>Enrolled Date</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {filteredEnrollments.map((enrollment) => (
+                        <TableRow key={enrollment.id}>
+                          <TableCell className="font-medium">{enrollment.user?.name ?? "—"}</TableCell>
+                          <TableCell>{enrollment.user?.email ?? "—"}</TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              <div className="w-24 bg-gray-200 rounded-full h-2">
+                                <div
+                                  className="bg-red-600 h-2 rounded-full"
+                                  style={{ width: `${enrollment.progress ?? 0}%` }}
+                                />
+                              </div>
+                              <span className="text-sm">{Math.round(enrollment.progress ?? 0)}%</span>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <Badge
+                              variant={
+                                enrollment.paymentStatus === "paid"
+                                  ? "default"
+                                  : enrollment.paymentStatus === "free"
+                                    ? "secondary"
+                                    : enrollment.paymentStatus === "refund"
+                                      ? "destructive"
+                                      : "outline"
+                              }
+                              className="capitalize"
+                            >
+                              {enrollment.paymentStatus ?? "pending"}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            {enrollment.enrolledAt
+                              ? new Date(enrollment.enrolledAt).toLocaleDateString()
+                              : "—"}
+                          </TableCell>
+                          </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  )}
+                </>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -567,25 +831,76 @@ export default function CourseDetailPage() {
           <Card>
             <CardHeader>
               <CardTitle>Enrolled Students</CardTitle>
-              <CardDescription>List of all students enrolled in this course</CardDescription>
+              <CardDescription>List of all actively enrolled students in this course</CardDescription>
             </CardHeader>
             <CardContent>
-              {enrollments.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No students enrolled yet.</p>
-              ) : (
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Student Name</TableHead>
-                        <TableHead>Email</TableHead>
-                        <TableHead>Progress</TableHead>
-                        <TableHead>Payment Status</TableHead>
-                        <TableHead>Enrolled Date</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {enrollments.map((enrollment) => (
+              {(() => {
+                const enrolledStudents = enrollments.filter((e) => e.paymentStatus === "paid" || e.paymentStatus === "free")
+                const filteredStudents = filteredEnrollments.filter((e) => e.paymentStatus === "paid" || e.paymentStatus === "free")
+                return enrolledStudents.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No students enrolled yet.</p>
+                ) : (
+                  <>
+                    {/* Search and Filter Bar */}
+                    <div className="mb-6 space-y-4">
+                      <div className="flex flex-col sm:flex-row gap-3">
+                        <div className="relative flex-1">
+                          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                          <Input
+                            placeholder="Search by student name or email..."
+                            value={enrollmentSearchQuery}
+                            onChange={(e) => setEnrollmentSearchQuery(e.target.value)}
+                            className="pl-10"
+                          />
+                        </div>
+                        <Select value={enrollmentDateFilter} onValueChange={setEnrollmentDateFilter}>
+                          <SelectTrigger className="w-full sm:w-[180px]">
+                            <SelectValue placeholder="All Dates" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all">All Dates</SelectItem>
+                            <SelectItem value="today">Today</SelectItem>
+                            <SelectItem value="week">Last 7 Days</SelectItem>
+                            <SelectItem value="month">Last 30 Days</SelectItem>
+                            <SelectItem value="year">Last Year</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        {(enrollmentSearchQuery || enrollmentDateFilter !== "all") && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={clearEnrollmentFilters}
+                            className="gap-2 bg-red-800 hover:bg-red-700 text-amber-100"
+                          >
+                            <X className="h-4 w-4" />
+                            Clear
+                          </Button>
+                        )}
+                      </div>
+                      {filteredStudents.length !== enrolledStudents.length && (
+                        <p className="text-sm text-muted-foreground">
+                          Showing {filteredStudents.length} of {enrolledStudents.length} students
+                        </p>
+                      )}
+                    </div>
+                    {filteredStudents.length === 0 ? (
+                      <p className="text-sm text-muted-foreground py-8 text-center">
+                        No students match your search criteria. Try adjusting your filters.
+                      </p>
+                    ) : (
+                      <div className="overflow-x-auto">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Student Name</TableHead>
+                              <TableHead>Email</TableHead>
+                              <TableHead>Progress</TableHead>
+                              <TableHead>Payment Status</TableHead>
+                              <TableHead>Enrolled Date</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {filteredStudents.map((enrollment) => (
                         <TableRow key={enrollment.id}>
                           <TableCell className="font-medium">{enrollment.user?.name ?? "—"}</TableCell>
                           <TableCell>{enrollment.user?.email ?? "—"}</TableCell>
@@ -619,12 +934,15 @@ export default function CourseDetailPage() {
                               ? new Date(enrollment.enrolledAt).toLocaleDateString()
                               : "—"}
                           </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              )}
+                            </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    )}
+                  </>
+                )
+              })()}
             </CardContent>
           </Card>
         </TabsContent>
@@ -641,20 +959,80 @@ export default function CourseDetailPage() {
                   No enrollments found for this course.
                 </p>
               ) : (
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Student Name</TableHead>
-                        <TableHead>Email</TableHead>
-                        <TableHead>Progress</TableHead>
-                        <TableHead>Payment Status</TableHead>
-                        <TableHead>Enrolled Date</TableHead>
-                        <TableHead className="text-right">Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {enrollments.map((enrollment) => (
+                <>
+                  {/* Search and Filter Bar */}
+                  <div className="mb-6 space-y-4">
+                    <div className="flex flex-col sm:flex-row gap-3">
+                      <div className="relative flex-1">
+                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                        <Input
+                          placeholder="Search by student name or email..."
+                          value={enrollmentSearchQuery}
+                          onChange={(e) => setEnrollmentSearchQuery(e.target.value)}
+                          className="pl-10"
+                        />
+                      </div>
+                      <Select value={enrollmentPaymentFilter} onValueChange={setEnrollmentPaymentFilter}>
+                        <SelectTrigger className="w-full sm:w-[180px]">
+                          <SelectValue placeholder="All Payment Status" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All Status</SelectItem>
+                          <SelectItem value="paid">Paid</SelectItem>
+                          <SelectItem value="free">Free</SelectItem>
+                          <SelectItem value="pending">Pending</SelectItem>
+                          <SelectItem value="refund">Refund</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <Select value={enrollmentDateFilter} onValueChange={setEnrollmentDateFilter}>
+                        <SelectTrigger className="w-full sm:w-[180px]">
+                          <SelectValue placeholder="All Dates" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All Dates</SelectItem>
+                          <SelectItem value="today">Today</SelectItem>
+                          <SelectItem value="week">Last 7 Days</SelectItem>
+                          <SelectItem value="month">Last 30 Days</SelectItem>
+                          <SelectItem value="year">Last Year</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      {(enrollmentSearchQuery || enrollmentPaymentFilter !== "all" || enrollmentDateFilter !== "all") && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={clearEnrollmentFilters}
+                          className="gap-2 bg-red-800 hover:bg-red-700 text-amber-100"
+                        >
+                          <X className="h-4 w-4" />
+                          Clear
+                        </Button>
+                      )}
+                    </div>
+                    {filteredEnrollments.length !== enrollments.length && (
+                      <p className="text-sm text-muted-foreground">
+                        Showing {filteredEnrollments.length} of {enrollments.length} enrollments
+                      </p>
+                    )}
+                  </div>
+                  {filteredEnrollments.length === 0 ? (
+                    <p className="text-sm text-muted-foreground py-8 text-center">
+                      No enrollments match your search criteria. Try adjusting your filters.
+                    </p>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Student Name</TableHead>
+                            <TableHead>Email</TableHead>
+                            <TableHead>Progress</TableHead>
+                            <TableHead>Payment Status</TableHead>
+                            <TableHead>Enrolled Date</TableHead>
+                            <TableHead className="text-right">Actions</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {filteredEnrollments.map((enrollment) => (
                         <TableRow key={enrollment.id}>
                           <TableCell className="font-medium">
                             {enrollment.user?.name ?? enrollment.userId ?? "—"}
@@ -705,29 +1083,31 @@ export default function CourseDetailPage() {
                                 className="h-8 w-8 p-0"
                                 title="Update Payment Status"
                               >
-                                <Pencil className="h-4 w-4" />
+                                <Pencil className="h-4 w-4 text-green-600" />
                               </Button>
                               <Button
                                 size="sm"
                                 variant="ghost"
                                 onClick={() => handleDeleteEnrollment(enrollment.id)}
                                 disabled={deletingEnrollment === enrollment.id}
-                                className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                                className="h-8 w-8 p-0"
                                 title="Delete Enrollment"
                               >
                                 {deletingEnrollment === enrollment.id ? (
-                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                  <Loader2 className="h-4 w-4 animate-spin text-red-600" />
                                 ) : (
-                                  <Trash2 className="h-4 w-4" />
+                                  <Trash2 className="h-4 w-4 text-red-600" />
                                 )}
                               </Button>
                             </div>
                           </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
+                          </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  )}
+                </>
               )}
             </CardContent>
           </Card>
@@ -920,7 +1300,7 @@ export default function CourseDetailPage() {
           <div className="space-y-4">
             {loadingUsers ? (
               <div className="flex items-center justify-center py-12">
-                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                <Loader2 className="h-8 w-8 animate-spin text-green-600" />
               </div>
             ) : allUsers.length === 0 ? (
               <p className="text-sm text-muted-foreground text-center py-8">
@@ -974,13 +1354,15 @@ export default function CourseDetailPage() {
             >
               {enrollingUsers ? (
                 <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Enrolling...
+                  <Loader2 className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2 animate-spin text-green-400" />
+                  <span className="hidden sm:inline">Enrolling...</span>
+                  <span className="sm:hidden">...</span>
                 </>
               ) : (
                 <>
-                  <UserPlus className="h-4 w-4 mr-2" />
-                  Save Enrollment ({selectedUserIds.size})
+                  <UserPlus className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2 text-green-400" />
+                  <span className="hidden sm:inline">Save Enrollment ({selectedUserIds.size})</span>
+                  <span className="sm:hidden">Save ({selectedUserIds.size})</span>
                 </>
               )}
             </Button>
@@ -1042,13 +1424,15 @@ export default function CourseDetailPage() {
               >
                 {updatingPayment ? (
                   <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Updating...
+                    <Loader2 className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2 animate-spin text-green-400" />
+                    <span className="hidden sm:inline">Updating...</span>
+                    <span className="sm:hidden">...</span>
                   </>
                 ) : (
                   <>
-                    <Pencil className="h-4 w-4 mr-2" />
-                    Update Status
+                    <Pencil className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2 text-green-400" />
+                    <span className="hidden sm:inline">Update Status</span>
+                    <span className="sm:hidden">Update</span>
                   </>
                 )}
               </Button>

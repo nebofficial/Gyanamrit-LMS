@@ -90,10 +90,16 @@ export async function addLesson(
 }
 
 export async function getLessonsByCourse(token: string, courseId: string) {
-  return apiFetch<{ status: string; data: Lesson[] }>(`/course/${courseId}`, {
+  const response = await apiFetch<{ status: string; message: string; data: { lessons?: Lesson[] } }>(`/course/${courseId}`, {
     method: 'GET',
     token,
   })
+  
+  // Backend returns course object with lessons array, extract lessons
+  return {
+    ...response,
+    data: response.data?.lessons || []
+  }
 }
 
 export async function getLessonById(token: string, courseId: string, lessonId: string) {

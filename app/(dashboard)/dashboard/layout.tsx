@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect } from "react"
+import { useEffect, useState } from "react"
 import { usePathname, useRouter } from "next/navigation"
 import Link from "next/link"
 import {
@@ -98,6 +98,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const { user, isAuthenticated, loading, logout } = useAuth()
   const router = useRouter()
   const pathname = usePathname()
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   useEffect(() => {
     if (!loading && !isAuthenticated) {
@@ -106,7 +111,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     }
   }, [isAuthenticated, loading, pathname, router])
 
-  if (!isAuthenticated) {
+  // Prevent hydration mismatch by waiting for mount before rendering sidebar
+  if (!mounted || loading || !isAuthenticated) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-muted">
         <p className="text-muted-foreground">Preparing your dashboard...</p>
